@@ -9,7 +9,8 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**The repo currently contains only documentation — no code yet.** The source of truth is:
+**Current status: phase 0 complete (pending Kieron's gate review); phase 1 not started.**
+The source of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,
   classification schema, report format, resolved decisions.
@@ -61,10 +62,40 @@ and a `.env` file.
 Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
 `.github/workflows/{w0-registry,w1-ingest,w2-crawl,w3-report}.yml`.
 
-## Development (once code exists)
+## What exists today (phase 0)
 
-- Node/TypeScript per the plan; entrypoints run via `npm run` scripts (one per workflow), locally
-  with `.env`.
+- **Scaffold:** Node 22 ESM TypeScript run via `tsx` (no build step); ESLint flat config enforces
+  the spoke-fp rules; vitest; exact-pinned deps; `#src/*` subpath imports (never relative `..`).
+- **Clients** (`src/clients/`): `slack.ts` (fetch; `SlackChannel` enum), `anthropic.ts`
+  (`@anthropic-ai/sdk`; `claude-haiku-4-5` + `claude-opus-4-8`), `voyage.ts` (fetch; `voyage-4`,
+  1024 dims), `turbopuffer.ts` (`@turbopuffer/turbopuffer`; `TpufNamespace` enum; region from
+  `TURBOPUFFER_REGION`, default `gcp-us-central1`), `firecrawl.ts` (fetch, v2 API).
+- **Registry** (`src/registry/`): types, TurboPuffer row conversion (`competitor:<slug>` /
+  `source:<url-hash>` ids, `record_type` attribute, 1024-dim dummy vector), validation, seed data
+  (`seed.ts`), markdown export. Seeded to the `registry` namespace on 2026-07-17 (7 competitors,
+  41 sources). `docs/sources-v1.md` is generated — edit `src/registry/seed.ts` and re-export,
+  never the doc directly.
+- **Entrypoints** (`src/cli/`): `verify.ts` (per-service auth checks + namespace bootstrap +
+  staging post; behind `phase0-verify.yml`), `registry.ts` (`--command seed|export`); `ingest`,
+  `crawl`, `report` are stubs until their phases.
+- **Workflows:** `ci.yml` (lint + typecheck + test on push), `phase0-verify.yml`, and the four
+  thin shells `w0-registry` / `w1-ingest` / `w2-crawl` / `w3-report` (`workflow_dispatch` only —
+  add each cron in the phase that implements the entrypoint).
+- All six TurboPuffer namespaces exist; each contains an idempotent `_bootstrap` marker row
+  (no `url`/`record_type` attributes, so production queries never match it).
+
+### Source-specific constraints (from phase 0 research — see docs/sources-v1.md notes)
+
+- Every `sec.gov` request (feeds + EDGAR) must send a declared-contact User-Agent
+  (e.g. `Aggie Intel research@spokephone.com`) or it 403s.
+- FINRA feeds are `http://` only; FinCEN and the RingCentral/8x8 status pages have no feeds
+  (crawl targets); RingCentral/8x8 job boards are Workday POST APIs, seeded inactive.
+
+## Development
+
+- Commands: `npm run check` (lint + typecheck + test — run before every commit),
+  `npm run verify|ingest|crawl|report|registry` (entrypoints; load `.env` if present via
+  `--env-file-if-exists`).
 - Unit tests cover every pure function (normalize, hash, cluster, canonical selection, dedupe
   verdict handling) against fixtures in `test/fixtures`, and run in CI on every push.
 - Failure handling: every entrypoint posts its own failures to Slack with context; ingestion is

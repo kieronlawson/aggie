@@ -38,8 +38,6 @@ Every stored item carries a `relationship` value (`displace` or `partner` for tr
 - RingCentral and 8x8 status-page incident feeds
 - Competitor press-release and blog feeds where published
 
-**Reddit API (search, weekly):** competitor names across r/VoIP, r/sysadmin, r/msp, and vertical-relevant subreddits.
-
 **Job boards (JSON, no scraping):** Greenhouse/Lever public endpoints for each competitor.
 
 **Firecrawl (weekly, change-tracking mode):** competitor pricing pages, changelogs and release notes, customer/case-study index pages, Theta Lake and Smarsh partner/integration directory pages, plus industry publications without feeds.
@@ -56,7 +54,7 @@ One repository. All logic is TypeScript; each workflow is a thin YAML shell (che
 
 **W0 — Registry editor (`workflow_dispatch`).** Adds or updates a competitor or source record via typed form inputs passed to the CLI. Validates that a source's competitor name exists in the registry before writing, so a typo cannot silently create a new competitor.
 
-**W1 — Feed ingest (daily cron).** Reads feed, Reddit, and job-board sources from the registry, fetches each, filters out already-seen URLs, and runs new items through P. (Reddit and job-board sources carry a weekly flag and only run on their day.)
+**W1 — Feed ingest (daily cron).** Reads feed and job-board sources from the registry, fetches each, filters out already-seen URLs, and runs new items through P. (Job-board sources carry a weekly flag and only run on their day.)
 
 **W2 — Crawl (weekly cron).** Reads the Firecrawl sources from the registry, starts the Firecrawl jobs in change-tracking mode, polls them to completion within the same run, discards unchanged pages and already-seen URLs, and runs new or changed content through P. Changed pages carry the diff, and classification runs on the diff plus page context, so a pricing change is classified from what changed, not the whole page.
 
@@ -85,7 +83,7 @@ One repository. All logic is TypeScript; each workflow is a thin YAML shell (che
 
 Vector: one Voyage embedding of title + summary.
 
-**Registry namespace (TurboPuffer):** competitor and source records as documents with a dummy vector. Competitor records: `name`, `relationship` (displace / partner), `aliases` (search terms for Reddit), `active`. Source records: `kind` (feed / reddit / job_board / crawl), `url`, `vertical`, `competitor`, `active`, `added_at`. Written by W0 only; read by W1, W2, and W3.
+**Registry namespace (TurboPuffer):** competitor and source records as documents with a dummy vector. Competitor records: `name`, `relationship` (displace / partner), `aliases` (alternate names, used for entity matching), `active`. Source records: `kind` (feed / job_board / crawl), `url`, `vertical`, `competitor`, `active`, `added_at`. Written by W0 only; read by W1, W2, and W3.
 
 **Reports namespace (TurboPuffer):** one document per delivered report. Attributes: `vertical`, `report_date`, `body` (full markdown). Vector: a Voyage embedding of the body — not needed for the latest-report fetch (that is an attribute filter), but it lets W3 or anyone ask "have we covered this before" across past reports for free.
 
@@ -108,7 +106,7 @@ One Slack message + email per vertical, Sunday evening NZT:
 ## Build phases
 
 1. **Feeds end-to-end** (W1 → P → W3 for one vertical). Proves the pipeline with zero crawling. ~1 weekend.
-2. **Reddit + job boards** into the same path, plus the alert branch (complaint/outage → Slack), which lands here because this phase first produces those classifications.
+2. **Job boards + alert branch** (complaint/outage → Slack) into the same path.
 3. **Firecrawl change-tracking** (W2) on the competitor page set.
 4. **Remaining verticals** — registry entries and report crons, no new code.
 

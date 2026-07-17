@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 
+import { scrapeRaw } from "#src/clients/firecrawl.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { type Relationship, type SourceRecord } from "#src/registry/types.ts";
 
@@ -32,7 +33,7 @@ const parseFeedXml = async (xml: string): Promise<FeedEntry[]> => {
   return feed.items;
 };
 
-const fetchFeedEntries = async (url: string): Promise<FeedEntry[]> => {
+const fetchDirect = async (url: string): Promise<FeedEntry[]> => {
   const response = await fetch(url, {
     headers: {
       "User-Agent": CONTACT_USER_AGENT,
@@ -45,6 +46,27 @@ const fetchFeedEntries = async (url: string): Promise<FeedEntry[]> => {
     throw new Error(`Feed fetch failed for ${url}: HTTP ${String(response.status)}`);
   }
   return parseFeedXml(await response.text());
+};
+
+/**
+ * Direct fetch first; on failure (bot-blocked host or an HTML challenge page
+ * instead of XML) retry once through Firecrawl, which fetches from
+ * residential-grade egress. Firecrawl wraps non-HTML bodies, so strip any
+ * wrapper before parsing.
+ */
+const fetchFeedEntries = async (url: string): Promise<FeedEntry[]> => {
+  try {
+    return await fetchDirect(url);
+  } catch {
+    const raw = await scrapeRaw(url);
+    const xmlStart = raw.indexOf("<?xml");
+    const rssStart = raw.search(/<(rss|feed)[\s>]/u);
+    const start = xmlStart >= 0 ? xmlStart : rssStart;
+    if (start < 0) {
+      throw new Error(`Feed fetch failed for ${url} directly and via Firecrawl (no XML in response)`);
+    }
+    return parseFeedXml(raw.slice(start));
+  }
 };
 
 /**

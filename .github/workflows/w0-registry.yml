@@ -4,11 +4,65 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "Registry command (phase 0 supports: seed)"
+        description: "Registry command"
         required: true
         type: choice
         options:
+          - add-source
+          - add-competitor
+          - set-source-active
           - seed
+      name:
+        description: "Display name (add-source / add-competitor)"
+        required: false
+        type: string
+      relationship:
+        description: "Competitor relationship (add-competitor)"
+        required: false
+        type: choice
+        default: displace
+        options:
+          - displace
+          - partner
+      aliases:
+        description: "Comma-separated aliases (add-competitor)"
+        required: false
+        type: string
+      kind:
+        description: "Source kind (add-source)"
+        required: false
+        type: choice
+        default: feed
+        options:
+          - feed
+          - job_board
+          - crawl
+      url:
+        description: "Source URL (add-source / set-source-active)"
+        required: false
+        type: string
+      vertical:
+        description: "Vertical (add-source)"
+        required: false
+        type: choice
+        default: finance
+        options:
+          - finance
+          - insurance
+          - healthcare
+          - competitor
+      competitor:
+        description: "Competitor name the source belongs to (add-source; empty for regulatory)"
+        required: false
+        type: string
+      active:
+        description: "Active flag"
+        required: false
+        type: choice
+        default: "true"
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
@@ -24,9 +78,27 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run registry -- --command "${{ inputs.command }}"
+      - run: >-
+          npm run registry --
+          --command "$INPUT_COMMAND"
+          --name "$INPUT_NAME"
+          --relationship "$INPUT_RELATIONSHIP"
+          --aliases "$INPUT_ALIASES"
+          --kind "$INPUT_KIND"
+          --url "$INPUT_URL"
+          --vertical "$INPUT_VERTICAL"
+          --competitor "$INPUT_COMPETITOR"
+          --active "$INPUT_ACTIVE"
         env:
+          INPUT_COMMAND: ${{ inputs.command }}
+          INPUT_NAME: ${{ inputs.name }}
+          INPUT_RELATIONSHIP: ${{ inputs.relationship }}
+          INPUT_ALIASES: ${{ inputs.aliases }}
+          INPUT_KIND: ${{ inputs.kind }}
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_VERTICAL: ${{ inputs.vertical }}
+          INPUT_COMPETITOR: ${{ inputs.competitor }}
+          INPUT_ACTIVE: ${{ inputs.active }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
           TURBOPUFFER_API_KEY: ${{ secrets.TURBOPUFFER_API_KEY }}

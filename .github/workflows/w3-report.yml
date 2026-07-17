@@ -2,6 +2,20 @@ name: w3-report
 
 on:
   workflow_dispatch:
+    inputs:
+      vertical:
+        description: "Vertical to report on (empty = finance)"
+        required: false
+        type: choice
+        default: finance
+        options:
+          - finance
+          - insurance
+          - healthcare
+          - competitor
+  schedule:
+    # Sundays 06:00 UTC = 18:00 NZST / 19:00 NZDT
+    - cron: "0 6 * * 0"
 
 permissions:
   contents: read
@@ -18,8 +32,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run report
+      - run: npm run report -- --vertical "$INPUT_VERTICAL"
         env:
+          INPUT_VERTICAL: ${{ inputs.vertical }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
           TURBOPUFFER_API_KEY: ${{ secrets.TURBOPUFFER_API_KEY }}

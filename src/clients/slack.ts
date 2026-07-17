@@ -13,6 +13,7 @@ type SlackResponse = {
   error?: string;
   team?: string;
   user?: string;
+  ts?: string;
 };
 
 const slackCall = async (method: string, body: Record<string, unknown>): Promise<SlackResponse> => {
@@ -31,8 +32,13 @@ const slackCall = async (method: string, body: Record<string, unknown>): Promise
   return payload;
 };
 
-const postMessage = async (channel: SlackChannel, text: string): Promise<void> => {
-  await slackCall("chat.postMessage", { channel, text });
+const postMessage = async (channel: SlackChannel, text: string): Promise<string> => {
+  const payload = await slackCall("chat.postMessage", { channel, text });
+  return payload.ts ?? "";
+};
+
+const postThreadReply = async (channel: SlackChannel, threadTs: string, text: string): Promise<void> => {
+  await slackCall("chat.postMessage", { channel, text, thread_ts: threadTs });
 };
 
 const authTest = async (): Promise<string> => {
@@ -40,4 +46,4 @@ const authTest = async (): Promise<string> => {
   return `team ${payload.team ?? "?"}, bot ${payload.user ?? "?"}`;
 };
 
-export { authTest, postMessage, SlackChannel };
+export { authTest, postMessage, postThreadReply, SlackChannel };

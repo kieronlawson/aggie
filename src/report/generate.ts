@@ -62,7 +62,13 @@ const rowToReportItem = (row: TpufResultRow): ReportItem => ({
 const fetchWeekItems = async (vertical: Vertical): Promise<ReportItem[]> => {
   const rows = await queryRows({
     namespace: itemsNamespaceFor(vertical),
-    filters: ["published_at_ms", "Gte", Date.now() - WEEK_MS],
+    filters: [
+      "And",
+      [
+        ["published_at_ms", "Gte", Date.now() - WEEK_MS],
+        ["relevant", "Eq", true]
+      ]
+    ],
     topK: ITEMS_QUERY_LIMIT,
     includeAttributes: ITEM_ATTRIBUTES,
     orderBy: ["published_at_ms", "desc"]

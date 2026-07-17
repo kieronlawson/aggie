@@ -46,6 +46,8 @@ type ClassifyResult = {
   title: string;
   summary: string;
   entities: string[];
+  /** False when the item does not touch communications compliance or a tracked competitor. */
+  relevant: boolean;
 };
 
 /** Fully processed item, matching the TurboPuffer item-namespace attributes. */

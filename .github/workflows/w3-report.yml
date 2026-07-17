@@ -13,6 +13,14 @@ on:
           - insurance
           - healthcare
           - competitor
+      force:
+        description: "Regenerate and re-post even if today's digest was already delivered"
+        required: false
+        type: choice
+        default: "false"
+        options:
+          - "false"
+          - "true"
   schedule:
     # Sundays 06:00 UTC = 18:00 NZST / 19:00 NZDT
     - cron: "0 6 * * 0"
@@ -32,9 +40,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run report -- --vertical "$INPUT_VERTICAL"
+      - run: npm run report -- --vertical "$INPUT_VERTICAL" --force "$INPUT_FORCE"
         env:
           INPUT_VERTICAL: ${{ inputs.vertical }}
+          INPUT_FORCE: ${{ inputs.force }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
           TURBOPUFFER_API_KEY: ${{ secrets.TURBOPUFFER_API_KEY }}

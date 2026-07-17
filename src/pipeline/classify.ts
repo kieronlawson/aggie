@@ -16,18 +16,29 @@ const CLASSIFY_SCHEMA = {
     sentiment: { type: "string", enum: ["", ...SENTIMENTS] },
     title: { type: "string" },
     summary: { type: "string", description: "2-3 sentence summary" },
-    entities: { type: "array", items: { type: "string" } }
+    entities: { type: "array", items: { type: "string" } },
+    relevant: { type: "boolean" }
   },
-  required: ["classification", "sentiment", "title", "summary", "entities"],
+  required: ["classification", "sentiment", "title", "summary", "entities", "relevant"],
   additionalProperties: false
 } as const;
 
 const SYSTEM_PROMPT =
   "You classify intel items for Spoke Phone, a cloud phone system vendor selling into regulated " +
-  "verticals (finance, insurance, healthcare). Items are regulatory news about communications " +
-  "compliance, or competitor intelligence. Classify the item, extract a clean title, write a 2-3 " +
-  "sentence summary, and list competitor/regulator entities mentioned. sentiment applies to " +
-  "complaints only (mild/moderate/severe); use an empty string otherwise.";
+  "verticals (finance, insurance, healthcare). Classify the item, extract a clean title, write a " +
+  "2-3 sentence summary, and list competitor/regulator entities mentioned. sentiment applies to " +
+  "complaints only (mild/moderate/severe); use an empty string otherwise.\n\n" +
+  "Set relevant=true ONLY when the item is either:\n" +
+  "(a) regulatory/legal news that touches BUSINESS COMMUNICATIONS compliance — recordkeeping or " +
+  "retention of electronic communications (voice, SMS, WhatsApp, email, video), off-channel " +
+  "communications enforcement, call recording/monitoring or consent rules, e-comms supervision " +
+  "and surveillance, telemarketing/robocall rules, or communications archiving obligations; or\n" +
+  "(b) intelligence about these companies: RingCentral, 8x8, Aircall, UJET, Twilio/Twilio Flex, " +
+  "Theta Lake, Smarsh — products, pricing, outages, complaints, hiring, partnerships, M&A, or " +
+  "their SEC filings.\n" +
+  "Set relevant=false for everything else — e.g. general privacy/data-broker/breach laws, AI or " +
+  "crypto regulation, ESG, employment law, tax, or securities-market news with no communications " +
+  "angle. When genuinely unsure, prefer relevant=true.";
 
 const buildClassifyPrompt = (item: RawItem): string =>
   [
@@ -59,7 +70,8 @@ const parseClassifyResult = (text: string): ClassifyResult => {
       sentiment: R.includes(sentiment, SENTIMENTS) ? (sentiment as Sentiment) : "",
       title: typeof parsed["title"] === "string" ? parsed["title"] : "",
       summary: typeof parsed["summary"] === "string" ? parsed["summary"] : "",
-      entities: asStringArray(parsed["entities"])
+      entities: asStringArray(parsed["entities"]),
+      relevant: typeof parsed["relevant"] === "boolean" ? parsed["relevant"] : true
     };
   } catch {
     throw new Error(`Unparseable classification response: ${text.slice(0, ERROR_SNIPPET_LENGTH)}`);

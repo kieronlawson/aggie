@@ -39,11 +39,14 @@ const deliverToSlack = async (header: string, digest: string): Promise<void> => 
   });
 };
 
+const TRUE_FLAG = "true";
+
 const main = async (): Promise<void> => {
-  const { values } = parseArgs({ options: { vertical: { type: "string" } } });
+  const { values } = parseArgs({ options: { vertical: { type: "string" }, force: { type: "string" } } });
   const vertical = parseVertical(values.vertical ?? "");
+  const force = values.force === TRUE_FLAG;
   const reportDate = new Date().toISOString().slice(0, DATE_LENGTH);
-  if (await alreadyDelivered(vertical, reportDate)) {
+  if (!force && (await alreadyDelivered(vertical, reportDate))) {
     console.log(`Digest for ${vertical} on ${reportDate} already delivered — skipping (idempotent re-run).`);
     return;
   }

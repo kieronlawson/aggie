@@ -11,12 +11,35 @@ describe("parseClassifyResult", () => {
         sentiment: "",
         title: "SEC fines broker-dealer",
         summary: "The SEC fined a firm for recordkeeping failures.",
-        entities: ["SEC"]
+        entities: ["SEC"],
+        relevant: true
       })
     );
     expect(result.classification).toBe(Classification.EnforcementAction);
     expect(result.sentiment).toBe("");
     expect(result.entities).toEqual(["SEC"]);
+    expect(result.relevant).toBe(true);
+  });
+
+  it("parses an off-topic verdict", () => {
+    const result = parseClassifyResult(
+      JSON.stringify({
+        classification: "commentary",
+        sentiment: "",
+        title: "New Jersey data broker rule update",
+        summary: "Registration deferred until the public registry launches.",
+        entities: [],
+        relevant: false
+      })
+    );
+    expect(result.relevant).toBe(false);
+  });
+
+  it("defaults relevance to true when the field is missing or malformed", () => {
+    const result = parseClassifyResult(
+      JSON.stringify({ classification: "other", sentiment: "", title: "t", summary: "s", entities: [] })
+    );
+    expect(result.relevant).toBe(true);
   });
 
   it("keeps sentiment for complaints", () => {

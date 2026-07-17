@@ -135,6 +135,7 @@ const storeItem = async (ctx: StoreContext): Promise<void> => {
       title: ctx.classified.title.length > 0 ? ctx.classified.title : ctx.item.title,
       summary: ctx.classified.summary,
       entities: ctx.classified.entities,
+      relevant: ctx.classified.relevant,
       merged_urls: [],
       content_hash: ctx.hash,
       story_id: ctx.storyId

@@ -1,13 +1,16 @@
+import { parseArgs } from "node:util";
+
 import * as R from "ramda";
 
 import { fetchFeedEntries, mapEntryToRawItem } from "#src/clients/feeds.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
-import { queryRows } from "#src/clients/turbopuffer.ts";
+import { patchRows, queryRows, type TpufResultRow } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
+import { classifyItem } from "#src/pipeline/classify.ts";
 import { itemsNamespaceFor, ProcessOutcome, processRawItem } from "#src/pipeline/process.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
-import { Relationship, SourceKind, type SourceRecord } from "#src/registry/types.ts";
+import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 /** Items older than this are ignored; the first run doubles as the backfill. */
 const INGEST_MAX_AGE_DAYS = 14;
@@ -90,7 +93,53 @@ const summarize = (results: SourceResult[]): string => {
   ].join("\n");
 };
 
-const main = async (): Promise<void> => {
+const BACKFILL_QUERY_LIMIT = 1200;
+const RELEVANCE_BACKFILL_MODE = "relevance-backfill";
+
+const str = (row: TpufResultRow, key: string): string => {
+  const value = row[key];
+  return typeof value === "string" ? value : "";
+};
+
+const reclassifyRow = async (vertical: Vertical, row: TpufResultRow): Promise<boolean> => {
+  const storedRelationship = str(row, "relationship");
+  const pseudoItem: RawItem = {
+    url: str(row, "url"),
+    title: str(row, "title"),
+    content: str(row, "summary").length > 0 ? str(row, "summary") : str(row, "title"),
+    published_at: str(row, "published_at"),
+    source: str(row, "source"),
+    vertical,
+    competitor: str(row, "competitor"),
+    relationship: storedRelationship.length > 0 ? (storedRelationship as Relationship) : Relationship.Regulatory
+  };
+  const classified = await classifyItem(pseudoItem);
+  await patchRows(itemsNamespaceFor(vertical), [{ id: row.id, relevant: classified.relevant }]);
+  return classified.relevant;
+};
+
+/** One-off: re-judges relevance for already-stored items that predate the filter. */
+const relevanceBackfill = async (): Promise<void> => {
+  const results = await sequentially(Object.values(Vertical), async (vertical) => {
+    const rows = await queryRows({
+      namespace: itemsNamespaceFor(vertical),
+      filters: ["url", "Glob", "http*"],
+      topK: BACKFILL_QUERY_LIMIT,
+      includeAttributes: ["url", "title", "summary", "competitor", "relationship", "published_at", "source"]
+    });
+    const verdicts = await sequentially(rows, (row) => reclassifyRow(vertical, row));
+    return { vertical, total: rows.length, relevant: R.count(Boolean, verdicts) };
+  });
+  const lines = R.map(
+    (result) => `${result.vertical}: ${String(result.relevant)}/${String(result.total)} relevant`,
+    results
+  );
+  const summary = `🧹 Aggie relevance backfill complete — ${lines.join(", ")}.`;
+  console.log(summary);
+  await postMessage(SlackChannel.IntelStaging, summary);
+};
+
+const runIngest = async (): Promise<void> => {
   const sources = await loadActiveSources(SourceKind.Feed);
   const competitors = await loadCompetitors();
   const relationshipByName = R.fromPairs(
@@ -100,6 +149,12 @@ const main = async (): Promise<void> => {
   const summary = summarize(results);
   console.log(summary);
   await postMessage(SlackChannel.IntelStaging, summary);
+};
+
+const main = async (): Promise<void> => {
+  const { values } = parseArgs({ options: { mode: { type: "string" } } });
+  const mode = values.mode ?? "";
+  await (mode === RELEVANCE_BACKFILL_MODE ? relevanceBackfill() : runIngest());
 };
 
 await main().catch(async (error: unknown) => {

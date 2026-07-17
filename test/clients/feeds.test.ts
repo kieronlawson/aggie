@@ -53,4 +53,16 @@ describe("parseFeedXml + mapEntryToRawItem", () => {
     expect(item.url).toBe("");
     expect(item.published_at).toBe(FALLBACK_ISO);
   });
+
+  it("coerces object-valued fields (FINRA-style xml2js output) to strings safely", () => {
+    const weird = {
+      title: { _: "Actual Title", $: { type: "text" } } as unknown as string,
+      link: { $: { href: "https://finra.org/x" } } as unknown as string,
+      content: { _: "Body text" } as unknown as string
+    };
+    const item = mapEntryToRawItem(weird, source, Relationship.Regulatory, FALLBACK_ISO);
+    expect(item.title).toBe("Actual Title");
+    expect(item.content).toBe("Body text");
+    expect(item.url).toBe("https://finra.org/x");
+  });
 });

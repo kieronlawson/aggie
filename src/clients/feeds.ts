@@ -34,7 +34,11 @@ const parseFeedXml = async (xml: string): Promise<FeedEntry[]> => {
 
 const fetchFeedEntries = async (url: string): Promise<FeedEntry[]> => {
   const response = await fetch(url, {
-    headers: { "User-Agent": CONTACT_USER_AGENT, Accept: FEED_ACCEPT },
+    headers: {
+      "User-Agent": CONTACT_USER_AGENT,
+      Accept: FEED_ACCEPT,
+      "Accept-Language": "en-US,en;q=0.9"
+    },
     redirect: "follow"
   });
   if (!response.ok) {
@@ -43,15 +47,34 @@ const fetchFeedEntries = async (url: string): Promise<FeedEntry[]> => {
   return parseFeedXml(await response.text());
 };
 
+/**
+ * xml2js occasionally yields objects instead of strings (attributes on the
+ * element, e.g. FINRA's atom links): `{_: "text", $: {...attrs}}`. Coerce
+ * defensively — an href attribute wins for links, `_` for text content.
+ */
+const asString = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "object" && value !== null) {
+    const record = value as { _?: unknown; $?: { href?: unknown } };
+    if (typeof record.$?.href === "string") {
+      return record.$.href;
+    }
+    return typeof record._ === "string" ? record._ : "";
+  }
+  return "";
+};
+
 const publishedIso = (entry: FeedEntry, fallbackIso: string): string => {
-  const raw = entry.isoDate ?? entry.pubDate ?? "";
+  const raw = asString(entry.isoDate ?? entry.pubDate ?? "");
   const ms = Date.parse(raw);
   return Number.isNaN(ms) ? fallbackIso : new Date(ms).toISOString();
 };
 
 const entryContent = (entry: FeedEntry): string => {
   const candidates = [entry["content:encoded"], entry.content, entry.summary, entry.contentSnippet, entry.title];
-  return candidates.find((candidate) => candidate !== undefined && candidate.trim().length > 0) ?? "";
+  return candidates.map(asString).find((candidate) => candidate.trim().length > 0) ?? "";
 };
 
 const mapEntryToRawItem = (
@@ -60,8 +83,8 @@ const mapEntryToRawItem = (
   relationship: Relationship,
   fallbackIso: string
 ): RawItem => ({
-  url: entry.link ?? "",
-  title: entry.title ?? "(untitled)",
+  url: asString(entry.link),
+  title: asString(entry.title).length > 0 ? asString(entry.title) : "(untitled)",
   content: entryContent(entry),
   published_at: publishedIso(entry, fallbackIso),
   source: source.url,

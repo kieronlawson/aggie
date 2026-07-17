@@ -32,11 +32,14 @@ type TpufResultRow = Record<string, unknown> & { id: string | number; $dist?: nu
 
 type TpufFilter = unknown[];
 
-const upsertRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<void> => {
+type TpufSchema = Record<string, { type: string; filterable?: boolean }>;
+
+const upsertRows = async (namespace: TpufNamespace, rows: TpufRow[], schema?: TpufSchema): Promise<void> => {
   await createTurbopuffer().namespace(namespace).write({
     upsert_rows: rows,
-    distance_metric: "cosine_distance"
-  });
+    distance_metric: "cosine_distance",
+    ...(schema === undefined ? {} : { schema })
+  } as Parameters<ReturnType<Turbopuffer["namespace"]>["write"]>[0]);
 };
 
 const patchRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<void> => {

@@ -146,9 +146,11 @@ const upsertReport = async (vertical: Vertical, reportDate: string, body: string
   if (vector === undefined) {
     throw new Error("Voyage returned no embedding for the report body");
   }
-  await upsertRows(TpufNamespace.Reports, [
-    { id: `report:${vertical}:${reportDate}`, vector, vertical, report_date: reportDate, body }
-  ]);
+  await upsertRows(
+    TpufNamespace.Reports,
+    [{ id: `report:${vertical}:${reportDate}`, vector, vertical, report_date: reportDate, body }],
+    { body: { type: "string", filterable: false } }
+  );
 };
 
 type GeneratedReport = {

@@ -19,6 +19,7 @@ All notable changes to Aggie. Dates are NZT.
   on the same day are skipped. First finance digest delivered.
 - 2026-07-17: W0 registry typed commands (`add-competitor`, `add-source`, `set-source-active`)
   with competitor-name validation; workflow inputs passed via env (zizmor-clean).
+- 2026-07-17: Relevance gate: Haiku classification judges communications-compliance/competitor relevance per item; reports include only relevant items; one-off backfill re-judged stored items (finance 12/225 relevant, competitor 35/39). Digest delivery reworked to threaded Slack mrkdwn after the first post rendered as a raw-markdown wall.
 - 2026-07-17: Real-world fixtures: three SEC off-channel enforcement syndication pairs + one
   press-release-inside-article case (`test/fixtures/dedupe-pairs.json`) exercising normalize,
   hash, and canonical selection. 61 unit tests total.

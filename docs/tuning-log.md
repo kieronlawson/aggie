@@ -13,3 +13,8 @@ Every change to a tuning threshold, with date and reason. Current values:
 - 2026-07-17 — Initial values set per spec: dedupe 0.90, alert `moderate` (phase 2). Report
   cluster threshold chosen at 0.85 (below the dedupe threshold so distinct-but-related items can
   share a digest cluster without being merge candidates).
+
+- 2026-07-17 — Added relevance gate to classification (item must touch business-communications
+  compliance or a tracked competitor; report queries filter `relevant Eq true`). Reason: first
+  finance digest was dominated by off-topic legal commentary (e.g. NJ data-broker registration).
+  Backfill re-judged existing items: finance 12/225 relevant, competitor 35/39.

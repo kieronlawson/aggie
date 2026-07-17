@@ -51,15 +51,34 @@ type QueryRowsOpts = {
   orderBy?: [string, "asc" | "desc"];
 };
 
+const MISSING_ATTRIBUTE_MARKER = "attribute not found";
+
+/**
+ * A namespace that has never stored a row with the filtered/ranked attribute
+ * rejects the query outright; for our queries that simply means "no matches
+ * yet" (fresh namespace containing only the bootstrap marker).
+ */
+const emptyIfMissingAttribute = (error: unknown): TpufResultRow[] => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes(MISSING_ATTRIBUTE_MARKER)) {
+    return [];
+  }
+  throw error;
+};
+
 /** Filter-only listing query, ordered by an attribute (default: id asc). */
 const queryRows = async (opts: QueryRowsOpts): Promise<TpufResultRow[]> => {
-  const result = await createTurbopuffer().namespace(opts.namespace).query({
-    rank_by: [opts.orderBy?.[0] ?? "id", opts.orderBy?.[1] ?? "asc"],
-    top_k: opts.topK,
-    include_attributes: opts.includeAttributes ?? true,
-    ...(opts.filters === undefined ? {} : { filters: opts.filters })
-  } as Parameters<ReturnType<Turbopuffer["namespace"]>["query"]>[0]);
-  return (result.rows ?? []) as TpufResultRow[];
+  try {
+    const result = await createTurbopuffer().namespace(opts.namespace).query({
+      rank_by: [opts.orderBy?.[0] ?? "id", opts.orderBy?.[1] ?? "asc"],
+      top_k: opts.topK,
+      include_attributes: opts.includeAttributes ?? true,
+      ...(opts.filters === undefined ? {} : { filters: opts.filters })
+    } as Parameters<ReturnType<Turbopuffer["namespace"]>["query"]>[0]);
+    return (result.rows ?? []) as TpufResultRow[];
+  } catch (error) {
+    return emptyIfMissingAttribute(error);
+  }
 };
 
 type QueryNearestOpts = {

@@ -3,8 +3,11 @@ import Parser from "rss-parser";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { type Relationship, type SourceRecord } from "#src/registry/types.ts";
 
-/** sec.gov (and good citizenship elsewhere) requires a declared-contact UA. */
-const CONTACT_USER_AGENT = "AggieIntel/0.1 (kieron@spokephone.com)";
+/**
+ * Browser-compatible UA with a declared contact: sec.gov requires the contact
+ * declaration, and several publishers block obviously non-browser agents.
+ */
+const CONTACT_USER_AGENT = "Mozilla/5.0 (compatible; AggieIntel/0.1; +https://spokephone.com; kieron@spokephone.com)";
 
 const FEED_ACCEPT = "application/rss+xml, application/atom+xml, application/xml, text/xml, */*";
 
@@ -21,8 +24,11 @@ type FeedEntry = {
 
 const parser = new Parser({ customFields: { item: ["content:encoded"] } });
 
+/** Escapes bare ampersands that are not part of a valid entity (seen in SEC feeds). */
+const sanitizeXml = (xml: string): string => xml.replace(/&(?![a-zA-Z][a-zA-Z0-9]*;|#\d+;|#x[0-9a-fA-F]+;)/gu, "&amp;");
+
 const parseFeedXml = async (xml: string): Promise<FeedEntry[]> => {
-  const feed = await parser.parseString(xml);
+  const feed = await parser.parseString(xml).catch(() => parser.parseString(sanitizeXml(xml)));
   return feed.items;
 };
 

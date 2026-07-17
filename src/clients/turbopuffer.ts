@@ -54,16 +54,18 @@ type QueryRowsOpts = {
   orderBy?: [string, "asc" | "desc"];
 };
 
-const MISSING_ATTRIBUTE_MARKER = "attribute not found";
+const MISSING_ATTRIBUTE_PATTERN = /attribute\b.*\bnot found/u;
 
 /**
- * A namespace that has never stored a row with the filtered/ranked attribute
- * rejects the query outright; for our queries that simply means "no matches
- * yet" (fresh namespace containing only the bootstrap marker).
+ * A namespace that has never stored a row with the filtered/ranked/included
+ * attribute rejects the query outright; for our queries that simply means
+ * "no matches yet" (fresh namespace containing only the bootstrap marker).
+ * Covers both error shapes: `filter error in key ...: attribute not found`
+ * and `attribute "x" not found in schema`.
  */
 const emptyIfMissingAttribute = (error: unknown): TpufResultRow[] => {
   const message = error instanceof Error ? error.message : String(error);
-  if (message.includes(MISSING_ATTRIBUTE_MARKER)) {
+  if (MISSING_ATTRIBUTE_PATTERN.test(message)) {
     return [];
   }
   throw error;

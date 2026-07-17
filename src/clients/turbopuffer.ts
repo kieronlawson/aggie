@@ -39,7 +39,7 @@ const upsertRows = async (namespace: TpufNamespace, rows: TpufRow[], schema?: Tp
     upsert_rows: rows,
     distance_metric: "cosine_distance",
     ...(schema === undefined ? {} : { schema })
-  } as Parameters<ReturnType<Turbopuffer["namespace"]>["write"]>[0]);
+  });
 };
 
 const patchRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<void> => {

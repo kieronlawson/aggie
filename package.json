@@ -1,0 +1,40 @@
+{
+  "name": "aggie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal intel aggregator for Spoke: regulatory news and competitor intelligence",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "imports": {
+    "#src/*": "./src/*"
+  },
+  "scripts": {
+    "verify": "node --env-file-if-exists=.env --import tsx src/cli/verify.ts",
+    "ingest": "node --env-file-if-exists=.env --import tsx src/cli/ingest.ts",
+    "crawl": "node --env-file-if-exists=.env --import tsx src/cli/crawl.ts",
+    "report": "node --env-file-if-exists=.env --import tsx src/cli/report.ts",
+    "registry": "node --env-file-if-exists=.env --import tsx src/cli/registry.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.112.1",
+    "@turbopuffer/turbopuffer": "2.6.0",
+    "ramda": "0.32.0"
+  },
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "5.10.0",
+    "@types/node": "26.1.1",
+    "@types/ramda": "0.32.0",
+    "eslint": "10.7.0",
+    "eslint-plugin-simple-import-sort": "14.0.0",
+    "tsx": "4.23.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.64.0",
+    "vitest": "4.1.10"
+  }
+}

@@ -4,6 +4,28 @@ All notable changes to Aggie. Dates are NZT.
 
 ## [Unreleased]
 
+### Phase 1 — Feeds end-to-end, finance vertical (built; acceptance window running)
+
+- 2026-07-17: P pipeline (`src/pipeline/`): normalize+hash, Haiku classification (structured
+  output), Voyage embedding, three-layer dedupe (exact hash → ≥0.90 neighbour arbitrated by
+  Haiku → canonical-URL selection favouring regulator/newsroom domains), TurboPuffer upsert.
+- 2026-07-17: W1 ingest implemented (daily cron 02:00 UTC): registry-driven feed fetch with
+  declared-contact UA, malformed-XML sanitization, Firecrawl fallback for bot-blocked hosts
+  (JD Supra, Radical Compliance), seen-URL filter, 14-day age cutoff. Backfill ingested ~264
+  items across 20/20 sources with 0 failures; re-runs proved idempotent.
+- 2026-07-17: W3 report implemented (Sunday cron 06:00 UTC): story_id+embedding clustering,
+  Haiku cluster summaries, Opus synthesis with previous report context, mrkdwn conversion,
+  threaded Slack delivery to `#intel-staging`, report upsert with non-filterable body; re-runs
+  on the same day are skipped. First finance digest delivered.
+- 2026-07-17: W0 registry typed commands (`add-competitor`, `add-source`, `set-source-active`)
+  with competitor-name validation; workflow inputs passed via env (zizmor-clean).
+- 2026-07-17: Real-world fixtures: three SEC off-channel enforcement syndication pairs + one
+  press-release-inside-article case (`test/fixtures/dedupe-pairs.json`) exercising normalize,
+  hash, and canonical selection. 61 unit tests total.
+- 2026-07-17: `docs/runbook.md` and `docs/tuning-log.md` started.
+- Remaining for the phase 1 gate: two consecutive scheduled daily W1 runs without intervention
+  (cron runs over the next two days), then Kieron's digest-quality review (go/no-go).
+
 ### Phase 0 — Environment verification and scaffolding (complete, pending gate review)
 
 - 2026-07-17: Phase 0 verify run green: all five API keys authenticated, six TurboPuffer

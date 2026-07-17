@@ -9,8 +9,8 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**Current status: phase 0 complete (pending Kieron's gate review); phase 1 not started.**
-The source of truth is:
+**Current status: phase 0 gate passed; phase 1 built — acceptance window running (two
+consecutive scheduled W1 runs), digest-quality gate review pending.** The source of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,
   classification schema, report format, resolved decisions.
@@ -62,7 +62,28 @@ and a `.env` file.
 Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
 `.github/workflows/{w0-registry,w1-ingest,w2-crawl,w3-report}.yml`.
 
-## What exists today (phase 0)
+## What exists today (phase 0 + phase 1)
+
+- **P pipeline** (`src/pipeline/`): `process.ts` orchestrates normalize → hash → layer-1 exact
+  dedupe → Haiku classify (structured output) → Voyage embed → layer-2 neighbour arbitration
+  (≥0.90, Haiku verdict duplicate/same_story/distinct, unparseable ⇒ distinct) → layer-3
+  canonical merge (`ORIGINATING_DOMAINS` beat syndicators) → upsert. Item ids are
+  `item:<sha16(url)>`; rows carry `published_at_ms` (uint) for range filters.
+- **W1 ingest** (`src/cli/ingest.ts`, daily cron): feeds only; declared-contact UA; malformed-XML
+  sanitize fallback; Firecrawl `scrapeRaw` fallback for bot-blocked hosts; seen-URL filter;
+  14-day age cutoff (first run = backfill). Per-source failures post as ⚠️ to staging.
+- **W3 report** (`src/cli/report.ts`, Sunday 06:00 UTC): trailing 7 days → cluster (story_id then
+  centroid ≥0.85) → Haiku summaries → Opus synthesis with previous report → static
+  manual-checks/footer sections → **mrkdwn conversion + threaded Slack delivery** (never post raw
+  markdown to Slack) → report upsert (`body` must stay non-filterable). Same-day re-runs skip.
+- **W0 registry**: `seed | export | add-competitor | add-source | set-source-active`; workflow
+  inputs flow through env vars (zizmor: never interpolate inputs into `run:`).
+- **Gotchas:** TurboPuffer rejects queries touching attributes absent from a namespace's schema —
+  `queryRows` treats that as "no matches" (fresh namespace). Filterable attributes cap at 4KB
+  (hence `body` non-filterable). `include_attributes: true` does not return vectors — list
+  `"vector"` explicitly.
+
+### Phase 0 scaffold
 
 - **Scaffold:** Node 22 ESM TypeScript run via `tsx` (no build step); ESLint flat config enforces
   the spoke-fp rules; vitest; exact-pinned deps; `#src/*` subpath imports (never relative `..`).

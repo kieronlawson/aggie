@@ -1,0 +1,33 @@
+name: w1-ingest
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: How many days back to ingest (default 3)
+        type: string
+      force_job_boards:
+        description: Also run job-board sources regardless of weekday
+        type: boolean
+        default: false
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run ingest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+          TURBOPUFFER_API_KEY: ${{ secrets.TURBOPUFFER_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          TURBOPUFFER_REGION: ${{ vars.TURBOPUFFER_REGION }}
+          OUTPUT_STAGE: ${{ vars.OUTPUT_STAGE }}
+          INPUT_BACKFILL_DAYS: ${{ inputs.backfill_days }}
+          INPUT_FORCE_JOB_BOARDS: ${{ inputs.force_job_boards }}

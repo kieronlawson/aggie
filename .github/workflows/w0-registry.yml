@@ -1,0 +1,61 @@
+name: w0-registry
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Registry action
+        required: true
+        type: choice
+        options: [add_competitor, add_source, disable_source, seed, export]
+      name:
+        description: Competitor name (add_competitor)
+        type: string
+      relationship:
+        description: Competitor relationship (add_competitor)
+        type: choice
+        options: ["", displace, partner]
+      aliases:
+        description: Comma-separated competitor aliases (add_competitor)
+        type: string
+      kind:
+        description: Source kind (add_source)
+        type: choice
+        options: ["", feed, job_board, crawl]
+      url:
+        description: Source URL (add_source / disable_source)
+        type: string
+      vertical:
+        description: Source vertical (add_source)
+        type: choice
+        options: ["", finance, insurance, healthcare, competitor]
+      competitor:
+        description: Competitor the source belongs to, if any (add_source)
+        type: string
+      cadence:
+        description: Fetch cadence (add_source, default daily)
+        type: choice
+        options: ["", daily, weekly]
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run registry
+        env:
+          TURBOPUFFER_API_KEY: ${{ secrets.TURBOPUFFER_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          TURBOPUFFER_REGION: ${{ vars.TURBOPUFFER_REGION }}
+          INPUT_ACTION: ${{ inputs.action }}
+          INPUT_NAME: ${{ inputs.name }}
+          INPUT_RELATIONSHIP: ${{ inputs.relationship }}
+          INPUT_ALIASES: ${{ inputs.aliases }}
+          INPUT_KIND: ${{ inputs.kind }}
+          INPUT_URL: ${{ inputs.url }}
+          INPUT_VERTICAL: ${{ inputs.vertical }}
+          INPUT_COMPETITOR: ${{ inputs.competitor }}
+          INPUT_CADENCE: ${{ inputs.cadence }}

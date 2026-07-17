@@ -1,0 +1,34 @@
+{
+  "name": "aggie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal intel aggregator: regulatory news and competitor intelligence for Spoke",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "verify": "tsx src/cli/verify.ts",
+    "ingest": "tsx src/cli/ingest.ts",
+    "crawl": "tsx src/cli/crawl.ts",
+    "report": "tsx src/cli/report.ts",
+    "registry": "tsx src/cli/registry.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.1",
+    "fast-xml-parser": "^5.2.5",
+    "ramda": "^0.31.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/ramda": "^0.31.1",
+    "eslint": "^9.30.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.35.0",
+    "vitest": "^3.2.0"
+  }
+}

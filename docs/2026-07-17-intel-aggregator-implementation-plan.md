@@ -18,7 +18,6 @@ Section 1 is Kieron's checklist: everything to provision before the build starts
 | Voyage AI | API key | Any current general-purpose embedding model |
 | TurboPuffer | API key + chosen region | Pick a US region (close to GitHub's runners) rather than NZ — every run queries it |
 | Firecrawl | API key | Paid tier; confirm the plan includes change-tracking. Webhooks are NOT needed — W2 polls |
-| Reddit | client_id + client_secret + account username | Create a "script" type app at reddit.com/prefs/apps; the username goes in the user-agent string Reddit requires |
 | Slack | Bot token with `chat:write`, invited to the three channels below | Or per-channel incoming webhooks if you prefer not to create a bot |
 | GitHub | Empty private repo (suggested name: `aggie`), Actions enabled, write access for the build agent, plus permission to set repository secrets (or set them yourself per 1.4) | The repo is the entire deployment surface |
 
@@ -37,7 +36,7 @@ Create and confirm names for:
 
 ### 1.4 Secrets placement
 
-All keys go into GitHub repository secrets (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `TURBOPUFFER_API_KEY`, `FIRECRAWL_API_KEY`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `SLACK_BOT_TOKEN`). The agent sets them via `gh secret set` if its token has admin on the repo; otherwise you paste them once in repo Settings → Secrets. No secrets in the repo contents, and a `.env.example` documents the set for local runs.
+All keys go into GitHub repository secrets (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `TURBOPUFFER_API_KEY`, `FIRECRAWL_API_KEY`, `SLACK_BOT_TOKEN`). The agent sets them via `gh secret set` if its token has admin on the repo; otherwise you paste them once in repo Settings → Secrets. No secrets in the repo contents, and a `.env.example` documents the set for local runs.
 
 ## 2. Phase 0 — Environment verification and scaffolding
 
@@ -50,7 +49,7 @@ All keys go into GitHub repository secrets (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY
 ```
 /.github/workflows   # w0-registry.yml, w1-ingest.yml, w2-crawl.yml, w3-report.yml — thin shells only
 /src
-  /clients           # thin typed wrappers: turbopuffer, anthropic, voyage, firecrawl, reddit, slack
+  /clients           # thin typed wrappers: turbopuffer, anthropic, voyage, firecrawl, slack
   /pipeline          # normalize, hash, classify, embed, dedupe, upsert (the P library)
   /report            # cluster, summarize, synthesize, format
   /registry          # read/write/validate registry records
@@ -61,7 +60,7 @@ All keys go into GitHub repository secrets (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY
 ```
 
 Workflow YAML rule, enforced from the first file: no logic in YAML. Each workflow is checkout → setup-node → `npm ci` → one `npm run` command with env from secrets, plus a `workflow_dispatch` trigger for manual re-runs. Any conditional or data threading belongs in the CLI entrypoint.
-5. Seed the registry: research and load the initial source list for finance (regulator feeds, EDGAR feeds for RingCentral and 8x8, status pages, competitor blogs/changelogs, subreddits, Greenhouse/Lever endpoints) plus the competitor records (RingCentral, 8x8, Aircall, UJET, Twilio Flex as displace; Theta Lake, Smarsh as partner). Output the seeded list as `docs/sources-v1.md` for review.
+5. Seed the registry: research and load the initial source list for finance (regulator feeds, EDGAR feeds for RingCentral and 8x8, status pages, competitor blogs/changelogs, Greenhouse/Lever endpoints) plus the competitor records (RingCentral, 8x8, Aircall, UJET, Twilio Flex as displace; Theta Lake, Smarsh as partner). Output the seeded list as `docs/sources-v1.md` for review.
 
 **Deliverables:** working repo scaffold with the four workflow shells, verified deploy loop, namespaces created, seeded registry, blocker list (empty or not).
 **Gate [K]:** review `docs/sources-v1.md` and the blocker list. ~15 minutes.
@@ -79,15 +78,14 @@ Workflow YAML rule, enforced from the first file: no logic in YAML. Each workflo
 **Acceptance test:** two consecutive scheduled daily runs complete without intervention; a manually dispatched W3 produces a finance digest in `#intel-staging` where no story appears twice and every item links a canonical URL.
 **Gate [K]:** read the staging digest; judge whether the content is worth receiving weekly. This is the go/no-go for the whole tool. ~15 minutes.
 
-## 4. Phase 2 — Reddit, job boards, and the alert branch
+## 4. Phase 2 — Job boards and the alert branch
 
 **Tasks**
-1. Reddit client: weekly search per competitor alias across registry subreddits, into the same P pipeline (weekly-flagged sources within the daily W1 run).
-2. Job-board client: Greenhouse/Lever JSON endpoints per competitor; postings classified as `hiring_signal` with location/role extraction.
-3. Alert branch in P: classification `complaint` or `outage` at or above the sentiment threshold posts immediately to `#intel-staging` (moves to `#competitive-intel` at the phase gate).
-4. Extend fixtures and tests: Reddit thread → complaint classification with sentiment; job-posting batch → hiring signal.
+1. Job-board client: Greenhouse/Lever JSON endpoints per competitor; postings classified as `hiring_signal` with location/role extraction.
+2. Alert branch in P: classification `complaint` or `outage` at or above the sentiment threshold posts immediately to `#intel-staging` (moves to `#competitive-intel` at the phase gate).
+3. Extend fixtures and tests: complaint text → complaint classification with sentiment; status-page incident → outage; job-posting batch → hiring signal.
 
-**Acceptance test:** one week of scheduled runs; digest includes a competitor section with Reddit-sourced items; at least one alert fires end-to-end (seed a fixture complaint if the week is quiet).
+**Acceptance test:** one week of scheduled runs; digest includes a competitor section with job-board and feed-sourced items; at least one alert fires end-to-end (seed a fixture complaint or outage if the week is quiet).
 **Gate [K]:** review alert quality — the risk here is noisy alerts training sales to ignore the channel. Tune the sentiment threshold for alerting (starts at `moderate`) before promoting to the real channel. ~15 minutes.
 
 ## 5. Phase 3 — Firecrawl change-tracking

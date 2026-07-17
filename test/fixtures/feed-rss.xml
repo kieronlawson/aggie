@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>SEC Press Releases</title>
+    <link>https://www.sec.gov/news/pressreleases</link>
+    <item>
+      <title>SEC Charges Broker-Dealer With Recordkeeping Failures</title>
+      <link>https://www.sec.gov/news/press-release/2026-100</link>
+      <pubDate>Wed, 15 Jul 2026 14:00:00 GMT</pubDate>
+      <description>The Securities and Exchange Commission today announced charges against a broker-dealer for widespread recordkeeping failures involving off-channel communications.</description>
+      <content:encoded><![CDATA[<p>The Securities and Exchange Commission today announced charges against a broker-dealer for <b>widespread recordkeeping failures</b> involving off-channel communications on personal devices.</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Item Without Content</title>
+      <link>https://www.sec.gov/news/press-release/2026-101</link>
+      <pubDate>Tue, 14 Jul 2026 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -24,7 +24,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.112.1",
     "@turbopuffer/turbopuffer": "2.6.0",
-    "ramda": "0.32.0"
+    "ramda": "0.32.0",
+    "rss-parser": "3.13.0"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

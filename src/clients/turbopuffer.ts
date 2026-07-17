@@ -28,6 +28,10 @@ const listNamespaces = async (): Promise<string[]> => {
 
 type TpufRow = Record<string, unknown> & { id: string | number };
 
+type TpufResultRow = Record<string, unknown> & { id: string | number; $dist?: number; vector?: number[] };
+
+type TpufFilter = unknown[];
+
 const upsertRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<void> => {
   await createTurbopuffer().namespace(namespace).write({
     upsert_rows: rows,
@@ -35,4 +39,56 @@ const upsertRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<vo
   });
 };
 
-export { ALL_NAMESPACES, createTurbopuffer, listNamespaces, TpufNamespace, type TpufRow, upsertRows };
+const patchRows = async (namespace: TpufNamespace, rows: TpufRow[]): Promise<void> => {
+  await createTurbopuffer().namespace(namespace).write({ patch_rows: rows });
+};
+
+type QueryRowsOpts = {
+  namespace: TpufNamespace;
+  filters?: TpufFilter;
+  topK: number;
+  includeAttributes?: true | string[];
+  orderBy?: [string, "asc" | "desc"];
+};
+
+/** Filter-only listing query, ordered by an attribute (default: id asc). */
+const queryRows = async (opts: QueryRowsOpts): Promise<TpufResultRow[]> => {
+  const result = await createTurbopuffer().namespace(opts.namespace).query({
+    rank_by: [opts.orderBy?.[0] ?? "id", opts.orderBy?.[1] ?? "asc"],
+    top_k: opts.topK,
+    include_attributes: opts.includeAttributes ?? true,
+    ...(opts.filters === undefined ? {} : { filters: opts.filters })
+  } as Parameters<ReturnType<Turbopuffer["namespace"]>["query"]>[0]);
+  return (result.rows ?? []) as TpufResultRow[];
+};
+
+type QueryNearestOpts = {
+  namespace: TpufNamespace;
+  vector: number[];
+  topK: number;
+  filters?: TpufFilter;
+};
+
+/** ANN query; rows carry $dist (cosine distance = 1 - cosine similarity). */
+const queryNearest = async (opts: QueryNearestOpts): Promise<TpufResultRow[]> => {
+  const result = await createTurbopuffer().namespace(opts.namespace).query({
+    rank_by: ["vector", "ANN", opts.vector],
+    top_k: opts.topK,
+    include_attributes: true,
+    ...(opts.filters === undefined ? {} : { filters: opts.filters })
+  } as Parameters<ReturnType<Turbopuffer["namespace"]>["query"]>[0]);
+  return (result.rows ?? []) as TpufResultRow[];
+};
+
+export {
+  ALL_NAMESPACES,
+  createTurbopuffer,
+  listNamespaces,
+  patchRows,
+  queryNearest,
+  queryRows,
+  TpufNamespace,
+  type TpufResultRow,
+  type TpufRow,
+  upsertRows
+};

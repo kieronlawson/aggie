@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>EDGAR Filings for RingCentral Inc</title>
+  <updated>2026-07-15T20:10:00-04:00</updated>
+  <entry>
+    <title>10-Q - Quarterly report</title>
+    <link rel="alternate" type="text/html" href="https://www.sec.gov/Archives/edgar/data/1384905/000138490526000001-index.htm"/>
+    <updated>2026-07-14T16:30:12-04:00</updated>
+    <id>urn:tag:sec.gov,2008:accession-number=0001384905-26-000001</id>
+    <summary type="html">&lt;b&gt;Filed:&lt;/b&gt; 2026-07-14 &lt;b&gt;AccNo:&lt;/b&gt; 0001384905-26-000001</summary>
+  </entry>
+</feed>

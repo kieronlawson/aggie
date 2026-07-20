@@ -144,13 +144,23 @@ const storeItem = async (ctx: StoreContext): Promise<void> => {
   ]);
 };
 
+/**
+ * Same-URL neighbour = updated version of a tracked page; deterministic
+ * same-story keeps change continuity and prevents duplicate-merge from
+ * swallowing the update.
+ */
 const layer2StoryId = async (
+  item: RawItem,
   classified: ClassifyResult,
   nearest: TpufResultRow | undefined
 ): Promise<string | null> => {
   const similarity = nearest?.$dist === undefined ? 0 : 1 - nearest.$dist;
   if (nearest === undefined || similarity < DEDUPE_SIMILARITY_THRESHOLD) {
     return "";
+  }
+  if (str(nearest, "url") === item.url) {
+    const selfStory = str(nearest, "story_id");
+    return selfStory.length > 0 ? selfStory : String(nearest.id);
   }
   const verdict = await arbitrate(classified, nearest);
   if (verdict === DedupeVerdict.Duplicate) {
@@ -188,7 +198,7 @@ const processRawItem = async (item: RawItem): Promise<ProcessOutcome> => {
     throw new Error(`Voyage returned no embedding for ${item.url}`);
   }
   const neighbours = await queryNearest({ namespace, vector, topK: 1 });
-  const storyId = await layer2StoryId(classified, neighbours[0]);
+  const storyId = await layer2StoryId(item, classified, neighbours[0]);
   if (storyId === null) {
     const nearest = neighbours[0];
     if (nearest !== undefined) {
@@ -200,4 +210,12 @@ const processRawItem = async (item: RawItem): Promise<ProcessOutcome> => {
   return ProcessOutcome.Stored;
 };
 
-export { DEDUPE_SIMILARITY_THRESHOLD, itemId, itemsNamespaceFor, ORIGINATING_DOMAINS, ProcessOutcome, processRawItem };
+export {
+  DEDUPE_SIMILARITY_THRESHOLD,
+  itemId,
+  itemsNamespaceFor,
+  layer2StoryId,
+  ORIGINATING_DOMAINS,
+  ProcessOutcome,
+  processRawItem
+};

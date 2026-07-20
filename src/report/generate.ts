@@ -124,7 +124,13 @@ const SYNTHESIS_SYSTEM = [
 const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: string): string =>
   [
     `Write this week's ${vertical} digest in markdown with exactly these sections:`,
-    "## New this week — one paragraph per story cluster (use the cluster summaries below; keep their links).",
+    "## This week's signals — the 2-3 most actionable stories, one bullet each formatted " +
+      "\"**<Role>:** <what to do with it>\" ending with the story link. Roles: Sales, Marketing, " +
+      'Product, Leadership. Write "Nothing requiring action this week." if no story is genuinely actionable.',
+    "## New this week — one paragraph per story cluster (use the cluster summaries below; keep their links). " +
+      "When a story has a concrete use for a team, end its paragraph with an italic line " +
+      "\"_Why it matters — **<Role>:** <one sentence>_\" (multiple role tags allowed). Omit the line for " +
+      'marginal stories — never write filler like "worth monitoring".',
     "## Continuing stories — clusters that also appear in the previous digest; one sentence each on what changed. " +
       'Write "None." if there are none.',
     vertical === Vertical.Competitor
@@ -191,4 +197,12 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
   return { body, clusters: clusters.length, items: items.length };
 };
 
-export { fetchWeekItems, generateDigestBody, latestReportBody, type ReportItem, SYNTHESIS_SYSTEM, upsertReport };
+export {
+  fetchWeekItems,
+  generateDigestBody,
+  latestReportBody,
+  type ReportItem,
+  SYNTHESIS_SYSTEM,
+  synthesisPrompt,
+  upsertReport
+};

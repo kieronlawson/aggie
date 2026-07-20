@@ -9,8 +9,9 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**Current status: phase 0 gate passed; phase 1 built — acceptance window running (two
-consecutive scheduled W1 runs), digest-quality gate review pending.** The source of truth is:
+**Current status: phase 0 and phase 1 gates passed (phase 1 signed off by Kieron 2026-07-20,
+waiving the remaining acceptance window). Next: phase 2/3 — ordering under review.** The
+source of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,
   classification schema, report format, resolved decisions.

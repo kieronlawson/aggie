@@ -107,10 +107,19 @@ const summarizeCluster = async (cluster: ReportItem[]): Promise<string> => {
   return askText(HAIKU_MODEL, SUMMARY_MAX_TOKENS, prompt);
 };
 
-const SYNTHESIS_SYSTEM =
-  "You write Aggie, Spoke Phone's internal weekly intel digest. Spoke sells a cloud phone system " +
-  "into regulated verticals; readers are sales, marketing, and leadership. Be factual and concise; " +
-  "plain language; no hype. Preserve source links exactly as given.";
+const SYNTHESIS_SYSTEM = [
+  "You write Aggie, Spoke Phone's internal weekly intel digest. Spoke sells a cloud phone system",
+  "with compliance call recording into regulated verticals (finance, insurance, healthcare).",
+  "Be factual and concise; plain language; no hype. Preserve source links exactly as given.",
+  "",
+  "Readers and how each uses intel:",
+  "- Sales: talking points for deals in regulated verticals (enforcement actions, recordkeeping rules).",
+  "- Marketing: content angles from regulatory changes or competitor gaps.",
+  "- Product: roadmap and compliance signals worth building toward.",
+  "- Leadership: competitive posture and market shifts.",
+  "",
+  "Partner-relationship items (Theta Lake, Smarsh) are opportunity, not threat."
+].join("\n");
 
 const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: string): string =>
   [
@@ -182,4 +191,4 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
   return { body, clusters: clusters.length, items: items.length };
 };
 
-export { fetchWeekItems, generateDigestBody, latestReportBody, type ReportItem, upsertReport };
+export { fetchWeekItems, generateDigestBody, latestReportBody, type ReportItem, SYNTHESIS_SYSTEM, upsertReport };

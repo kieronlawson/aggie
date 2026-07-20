@@ -27,11 +27,18 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 | CFTC press releases | feed | — | https://www.cftc.gov/RSS/RSSGP/rssgp.xml |
 | FINRA news & speeches | feed | — | http://feeds.finra.org/FINRANews |
 | FINRA notices | feed | — | http://feeds.finra.org/FINRANotices |
+| CFPB newsroom | feed | — | https://www.consumerfinance.gov/about-us/newsroom/feed/ |
+| Federal Reserve enforcement actions | feed | — | https://www.federalreserve.gov/feeds/press_enforcement.xml |
+| OCC news releases | feed | — | https://www.occ.gov/rss/occ_news.xml |
+| FTC press releases | feed | — | https://www.ftc.gov/feeds/press-release.xml |
+| Compliance Week | feed | — | https://www.complianceweek.com/rss |
+| Banking Dive | feed | — | https://www.bankingdive.com/feeds/news/ |
 | JD Supra — Securities Law | feed | — | https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=SecuritiesLaw&premium=1 |
 | JD Supra — Finance & Banking | feed | — | https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=FinanceBanking&premium=1 |
 | Radical Compliance | feed | — | https://www.radicalcompliance.com/feed/ |
 | Global Relay blog | feed | — | https://www.globalrelay.com/feed/ |
 | National Law Review — recent contributions | feed | — | https://www.natlawreview.com/recent-contributions/feed |
+| TCPAWorld (Troutman Amin) | feed | — | https://www.tcpaworld.com/feed/ |
 
 ### Crawl targets (Firecrawl change-tracking)
 
@@ -96,4 +103,5 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 - Theta Lake's SmartRecruiters endpoint is valid but currently lists zero postings.
 - 8x8 pricing page returned 429 (Cloudflare rate limit) during verification — UNVERIFIED; expected to work through Firecrawl in phase 3.
 - Aircall publishes no blog RSS (their /feed URL serves an HTML app); coverage comes from their status feed, Lever job board, and pricing-page crawl.
+- Sources-v2 (2026-07-20): FTC press releases carry mostly non-telemarketing output — the relevance gate does the filtering. Banking Dive is high-volume general banking news; same reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md.
 

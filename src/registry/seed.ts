@@ -1,12 +1,15 @@
 import { type CompetitorRecord, Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 /**
- * Initial registry seed (phase 0), researched and URL-verified on 2026-07-17.
- * Every feed/job-board URL returned HTTP 200 with the claimed format at seed time,
- * except where noted in SEED_NOTES. After phase 0 the registry is edited only via W0.
+ * Registry seed: phase 0 set researched and URL-verified on 2026-07-17, plus the
+ * sources-v2 additions Kieron approved on 2026-07-20 (see docs/sources-v2-candidates.md
+ * for per-feed verification). Every feed/job-board URL returned HTTP 200 with the claimed
+ * format at seed time, except where noted in SEED_NOTES. After phase 0 the registry is
+ * edited only via W0 (or a reviewed seed.ts change re-run through seed).
  */
 
 const ADDED_AT = "2026-07-17T00:00:00Z";
+const ADDED_AT_V2 = "2026-07-20T00:00:00Z";
 
 const SEED_COMPETITORS: CompetitorRecord[] = [
   { name: "RingCentral", relationship: Relationship.Displace, aliases: ["RNG", "RingCentral MVP", "RingEX"], active: true },
@@ -38,13 +41,27 @@ const competitorSource = (kind: SourceKind, name: string, url: string, competito
   added_at: ADDED_AT
 });
 
+const financeFeedV2 = (name: string, url: string): SourceRecord => ({
+  ...financeFeed(name, url),
+  added_at: ADDED_AT_V2
+});
+
 const REGULATOR_FEEDS: SourceRecord[] = [
   financeFeed("SEC press releases", "https://www.sec.gov/news/pressreleases.rss"),
   financeFeed("SEC litigation releases", "https://www.sec.gov/enforcement-litigation/litigation-releases/rss"),
   financeFeed("SEC administrative proceedings", "https://www.sec.gov/enforcement-litigation/administrative-proceedings/rss"),
   financeFeed("CFTC press releases", "https://www.cftc.gov/RSS/RSSGP/rssgp.xml"),
   financeFeed("FINRA news & speeches", "http://feeds.finra.org/FINRANews"),
-  financeFeed("FINRA notices", "http://feeds.finra.org/FINRANotices")
+  financeFeed("FINRA notices", "http://feeds.finra.org/FINRANotices"),
+  financeFeedV2("CFPB newsroom", "https://www.consumerfinance.gov/about-us/newsroom/feed/"),
+  financeFeedV2("Federal Reserve enforcement actions", "https://www.federalreserve.gov/feeds/press_enforcement.xml"),
+  financeFeedV2("OCC news releases", "https://www.occ.gov/rss/occ_news.xml"),
+  financeFeedV2("FTC press releases", "https://www.ftc.gov/feeds/press-release.xml")
+];
+
+const TRADE_PRESS_FEEDS: SourceRecord[] = [
+  financeFeedV2("Compliance Week", "https://www.complianceweek.com/rss"),
+  financeFeedV2("Banking Dive", "https://www.bankingdive.com/feeds/news/")
 ];
 
 const COMMENTARY_FEEDS: SourceRecord[] = [
@@ -52,7 +69,8 @@ const COMMENTARY_FEEDS: SourceRecord[] = [
   financeFeed("JD Supra — Finance & Banking", "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=FinanceBanking&premium=1"),
   financeFeed("Radical Compliance", "https://www.radicalcompliance.com/feed/"),
   financeFeed("Global Relay blog", "https://www.globalrelay.com/feed/"),
-  financeFeed("National Law Review — recent contributions", "https://www.natlawreview.com/recent-contributions/feed")
+  financeFeed("National Law Review — recent contributions", "https://www.natlawreview.com/recent-contributions/feed"),
+  financeFeedV2("TCPAWorld (Troutman Amin)", "https://www.tcpaworld.com/feed/")
 ];
 
 const COMPETITOR_FEEDS: SourceRecord[] = [
@@ -109,6 +127,7 @@ const CRAWL_TARGETS: SourceRecord[] = [
 
 const SEED_SOURCES: SourceRecord[] = [
   ...REGULATOR_FEEDS,
+  ...TRADE_PRESS_FEEDS,
   ...COMMENTARY_FEEDS,
   ...COMPETITOR_FEEDS,
   ...JOB_BOARDS,
@@ -129,7 +148,12 @@ const SEED_NOTES: string[] = [
   "8x8 pricing page returned 429 (Cloudflare rate limit) during verification — UNVERIFIED; " +
     "expected to work through Firecrawl in phase 3.",
   "Aircall publishes no blog RSS (their /feed URL serves an HTML app); coverage comes from " +
-    "their status feed, Lever job board, and pricing-page crawl."
+    "their status feed, Lever job board, and pricing-page crawl.",
+  "Sources-v2 (2026-07-20): FTC press releases carry mostly non-telemarketing output — the " +
+    "relevance gate does the filtering. Banking Dive is high-volume general banking news; same " +
+    "reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest " +
+    "robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); " +
+    "ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md."
 ];
 
 export { SEED_COMPETITORS, SEED_NOTES, SEED_SOURCES };

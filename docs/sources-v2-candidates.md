@@ -104,3 +104,11 @@ These have no usable feed (WAF-blocked, HTML-only, or paywalled) but are worth c
 - **RingCentral investor press releases** — `https://ir.ringcentral.com` (Cloudflare-gated; IR-grade detail beyond the blog).
 - **FCC per-bureau feeds** — if the Actions-egress fetch still fails after confirming URLs, crawl the Daily Digest / Enforcement Bureau headline pages instead.
 - **InvestmentNews Regulation section** — `https://www.investmentnews.com/regulation-legal-compliance` (live but paywalled; low priority given the paywall).
+
+---
+
+## Next round (planned, not started)
+
+Kieron (2026-07-20): a keyword-focused research round follows this one — TCPA, 10DLC, DNC,
+Campaign Registry (TCR), and adjacent messaging-compliance terms. Goal: sources found by
+searching the topic space, not by walking known publishers.

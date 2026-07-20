@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { parseClassifyResult } from "#src/pipeline/classify.ts";
-import { Classification, Sentiment } from "#src/pipeline/types.ts";
+import { parseClassifyResult, SYSTEM_PROMPT } from "#src/pipeline/classify.ts";
+import { Classification, ContentKind, Sentiment } from "#src/pipeline/types.ts";
 
 describe("parseClassifyResult", () => {
   it("parses a valid structured response", () => {
@@ -73,5 +73,45 @@ describe("parseClassifyResult", () => {
 
   it("throws a clear error on unparseable JSON", () => {
     expect(() => parseClassifyResult("not json at all")).toThrow(/classification response/iu);
+  });
+});
+
+describe("content_kind parsing", () => {
+  it("passes evergreen through", () => {
+    const result = parseClassifyResult(
+      JSON.stringify({
+        classification: "regulatory",
+        sentiment: "",
+        title: "T",
+        summary: "S",
+        entities: [],
+        relevant: true,
+        content_kind: "evergreen"
+      })
+    );
+    expect(result.content_kind).toBe(ContentKind.Evergreen);
+  });
+
+  it("defaults missing or unknown content_kind to news", () => {
+    const base = {
+      classification: "regulatory",
+      sentiment: "",
+      title: "T",
+      summary: "S",
+      entities: [],
+      relevant: true
+    };
+    expect(parseClassifyResult(JSON.stringify(base)).content_kind).toBe(ContentKind.News);
+    expect(parseClassifyResult(JSON.stringify({ ...base, content_kind: "blog" })).content_kind).toBe(
+      ContentKind.News
+    );
+  });
+});
+
+describe("content_kind in prompt", () => {
+  it("instructs the news/evergreen distinction", () => {
+    expect(SYSTEM_PROMPT).toContain("content_kind=news");
+    expect(SYSTEM_PROMPT).toContain("content_kind=evergreen");
+    expect(SYSTEM_PROMPT).toContain("dated event");
   });
 });

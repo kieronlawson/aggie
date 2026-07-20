@@ -28,6 +28,11 @@ enum DedupeVerdict {
   Distinct = "distinct"
 }
 
+enum ContentKind {
+  News = "news",
+  Evergreen = "evergreen"
+}
+
 /** An item as fetched from a source, before classification. */
 type RawItem = {
   url: string;
@@ -48,6 +53,8 @@ type ClassifyResult = {
   entities: string[];
   /** False when the item does not touch communications compliance or a tracked competitor. */
   relevant: boolean;
+  /** Evergreen = undated guidance/thought-leadership; excluded from digest stories. */
+  content_kind: ContentKind;
 };
 
 /** Fully processed item, matching the TurboPuffer item-namespace attributes. */
@@ -58,4 +65,4 @@ type ProcessedItem = RawItem & ClassifyResult & {
   published_at_ms: number;
 };
 
-export { Classification, type ClassifyResult, DedupeVerdict, type ProcessedItem, type RawItem, Sentiment };
+export { Classification, type ClassifyResult, ContentKind, DedupeVerdict, type ProcessedItem, type RawItem, Sentiment };

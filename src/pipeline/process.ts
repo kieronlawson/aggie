@@ -136,6 +136,7 @@ const storeItem = async (ctx: StoreContext): Promise<void> => {
       summary: ctx.classified.summary,
       entities: ctx.classified.entities,
       relevant: ctx.classified.relevant,
+      content_kind: ctx.classified.content_kind,
       merged_urls: [],
       content_hash: ctx.hash,
       story_id: ctx.storyId

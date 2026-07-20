@@ -1,6 +1,13 @@
 # Aggie — Internal Intel Aggregator (Implementation Plan)
 
 **Date:** 2026-07-17 (rev 2 — orchestration moved from Pipedream to GitHub Actions)
+**Amendment (2026-07-20, Kieron):** phase 1 gate signed off early (acceptance window waived).
+Phases 2 and 3 are REORDERED — Firecrawl change-tracking (§5) builds next; job boards + the
+alert branch (§4) build after it, keeping their alert-quality gate as the final review before
+the §5-described channel cutover, which moves to whichever phase completes last. Reason: the
+sources-v2/v3 research found the highest-value uncovered sources are all feedless (Smarsh,
+8x8/Aircall newsrooms, 10DLC carrier-policy trackers), and the alert branch's best outage
+sources (RingCentral/8x8 status pages) are themselves crawl targets.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 

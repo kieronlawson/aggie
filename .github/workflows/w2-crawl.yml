@@ -2,6 +2,9 @@ name: w2-crawl
 
 on:
   workflow_dispatch:
+  schedule:
+    # Saturday at 02:00 UTC — after Friday's W1, before Sunday 06:00 W3.
+    - cron: "0 2 * * 6"
 
 permissions:
   contents: read

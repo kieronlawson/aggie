@@ -18,3 +18,7 @@ Every change to a tuning threshold, with date and reason. Current values:
   compliance or a tracked competitor; report queries filter `relevant Eq true`). Reason: first
   finance digest was dominated by off-topic legal commentary (e.g. NJ data-broker registration).
   Backfill re-judged existing items: finance 12/225 relevant, competitor 35/39.
+
+- 2026-07-20 — Added `content_kind` news/evergreen to the classifier; evergreen items excluded
+  from digest stories, surfaced once in "Worth a read". Reason: evergreen vendor content (Global
+  Relay) recurring as pseudo-news in continuing stories.

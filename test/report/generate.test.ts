@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Vertical } from "#src/registry/types.ts";
-import { clusterSummaryPrompt, SYNTHESIS_SYSTEM, synthesisPrompt } from "#src/report/generate.ts";
+import { clusterSummaryPrompt, isEvergreen, SYNTHESIS_SYSTEM, synthesisPrompt, worthAReadSection } from "#src/report/generate.ts";
 
 describe("SYNTHESIS_SYSTEM", () => {
   it("grounds the model in Spoke's product and verticals", () => {
@@ -33,7 +33,8 @@ const ITEM = {
   competitor: "",
   relationship: "regulatory",
   published_at: "2026-07-18",
-  merged_urls: []
+  merged_urls: [],
+  content_kind: ""
 };
 
 const SUMMARIES = ["FINRA fined a broker-dealer over off-channel texting (https://example.com/finra)."];
@@ -104,5 +105,23 @@ describe("synthesisPrompt", () => {
   it("threads the summaries and previous digest through", () => {
     expect(prompt).toContain("- FINRA fined a broker-dealer");
     expect(prompt).toContain("An older story.");
+  });
+});
+
+describe("evergreen handling", () => {
+  it("treats missing content_kind as news", () => {
+    expect(isEvergreen({ ...ITEM, content_kind: "" })).toBe(false);
+    expect(isEvergreen({ ...ITEM, content_kind: "news" })).toBe(false);
+    expect(isEvergreen({ ...ITEM, content_kind: "evergreen" })).toBe(true);
+  });
+
+  it("renders worth-a-read as linked one-liners", () => {
+    const section = worthAReadSection([{ ...ITEM, content_kind: "evergreen" }]);
+    expect(section).toContain("## 📚 Worth a read");
+    expect(section).toContain("- [FINRA example](https://www.finra.org/media-center/newsreleases/2026/example) — A FINRA thing happened.");
+  });
+
+  it("renders nothing when there are no evergreen items", () => {
+    expect(worthAReadSection([])).toBe("");
   });
 });

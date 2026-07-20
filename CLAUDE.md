@@ -68,7 +68,9 @@ Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
   dedupe → Haiku classify (structured output) → Voyage embed → layer-2 neighbour arbitration
   (≥0.90, Haiku verdict duplicate/same_story/distinct, unparseable ⇒ distinct) → layer-3
   canonical merge (`ORIGINATING_DOMAINS` beat syndicators) → upsert. Item ids are
-  `item:<sha16(url)>`; rows carry `published_at_ms` (uint) for range filters.
+  `item:<sha16(url)>`; rows carry `published_at_ms` (uint) for range filters and `content_kind`
+  (news/evergreen; evergreen surfaces once in the digest's Worth-a-read section, never as
+  stories).
 - **W1 ingest** (`src/cli/ingest.ts`, daily cron): feeds only; declared-contact UA; malformed-XML
   sanitize fallback; Firecrawl `scrapeRaw` fallback for bot-blocked hosts; seen-URL filter;
   14-day age cutoff (first run = backfill). Per-source failures post as ⚠️ to staging.

@@ -5,6 +5,7 @@ import { queryRows, TpufNamespace, type TpufResultRow, upsertRows } from "#src/c
 import { embed } from "#src/clients/voyage.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { itemsNamespaceFor } from "#src/pipeline/process.ts";
+import { ContentKind } from "#src/pipeline/types.ts";
 import { Vertical } from "#src/registry/types.ts";
 import { clusterItems } from "#src/report/cluster.ts";
 
@@ -25,6 +26,7 @@ type ReportItem = {
   relationship: string;
   published_at: string;
   merged_urls: string[];
+  content_kind: string;
 };
 
 const ITEM_ATTRIBUTES = [
@@ -37,7 +39,8 @@ const ITEM_ATTRIBUTES = [
   "competitor",
   "relationship",
   "published_at",
-  "merged_urls"
+  "merged_urls",
+  "content_kind"
 ];
 
 const str = (row: TpufResultRow, key: string): string => {
@@ -56,7 +59,8 @@ const rowToReportItem = (row: TpufResultRow): ReportItem => ({
   competitor: str(row, "competitor"),
   relationship: str(row, "relationship"),
   published_at: str(row, "published_at"),
-  merged_urls: Array.isArray(row["merged_urls"]) ? (row["merged_urls"] as string[]) : []
+  merged_urls: Array.isArray(row["merged_urls"]) ? (row["merged_urls"] as string[]) : [],
+  content_kind: str(row, "content_kind")
 });
 
 const fetchWeekItems = async (vertical: Vertical): Promise<ReportItem[]> => {
@@ -109,6 +113,20 @@ const clusterSummaryPrompt = (cluster: ReportItem[]): string =>
 
 const summarizeCluster = async (cluster: ReportItem[]): Promise<string> =>
   askText(HAIKU_MODEL, SUMMARY_MAX_TOKENS, clusterSummaryPrompt(cluster));
+
+const isEvergreen = (item: ReportItem): boolean =>
+  item.content_kind === (ContentKind.Evergreen as string);
+
+const WORTH_A_READ_HEADING = "## 📚 Worth a read";
+
+const worthAReadSection = (items: ReportItem[]): string =>
+  items.length === 0
+    ? ""
+    : [
+      WORTH_A_READ_HEADING,
+      "",
+      ...R.map((item: ReportItem) => `- [${item.title}](${item.url}) — ${item.summary}`, items)
+    ].join("\n");
 
 const SYNTHESIS_SYSTEM = [
   "You write Aggie, Spoke Phone's internal weekly intel digest. Spoke sells a cloud phone system",
@@ -200,15 +218,21 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
   if (items.length === 0) {
     return { body: "", clusters: 0, items: 0 };
   }
-  const clusters = clusterItems(items);
+  const [evergreen, news] = R.partition(isEvergreen, items);
+  const reading = worthAReadSection(evergreen);
+  if (news.length === 0) {
+    return { body: reading, clusters: 0, items: items.length };
+  }
+  const clusters = clusterItems(news);
   const summaries = await sequentially(clusters, summarizeCluster);
   const previousBody = await latestReportBody(vertical);
-  const body = await askText(
+  const synthesized = await askText(
     OPUS_MODEL,
     SYNTHESIS_MAX_TOKENS,
     synthesisPrompt(vertical, summaries, previousBody),
     SYNTHESIS_SYSTEM
   );
+  const body = [synthesized, reading].filter((part) => part.length > 0).join("\n\n");
   return { body, clusters: clusters.length, items: items.length };
 };
 
@@ -216,9 +240,11 @@ export {
   clusterSummaryPrompt,
   fetchWeekItems,
   generateDigestBody,
+  isEvergreen,
   latestReportBody,
   type ReportItem,
   SYNTHESIS_SYSTEM,
   synthesisPrompt,
-  upsertReport
+  upsertReport,
+  worthAReadSection
 };

@@ -27,6 +27,7 @@ type ReportItem = {
   published_at: string;
   merged_urls: string[];
   content_kind: string;
+  source: string;
 };
 
 const ITEM_ATTRIBUTES = [
@@ -40,7 +41,8 @@ const ITEM_ATTRIBUTES = [
   "relationship",
   "published_at",
   "merged_urls",
-  "content_kind"
+  "content_kind",
+  "source"
 ];
 
 const str = (row: TpufResultRow, key: string): string => {
@@ -60,7 +62,8 @@ const rowToReportItem = (row: TpufResultRow): ReportItem => ({
   relationship: str(row, "relationship"),
   published_at: str(row, "published_at"),
   merged_urls: Array.isArray(row["merged_urls"]) ? (row["merged_urls"] as string[]) : [],
-  content_kind: str(row, "content_kind")
+  content_kind: str(row, "content_kind"),
+  source: str(row, "source")
 });
 
 const fetchWeekItems = async (vertical: Vertical): Promise<ReportItem[]> => {
@@ -211,17 +214,19 @@ type GeneratedReport = {
   body: string;
   clusters: number;
   items: number;
+  itemSources: string[];
 };
 
 const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> => {
   const items = await fetchWeekItems(vertical);
   if (items.length === 0) {
-    return { body: "", clusters: 0, items: 0 };
+    return { body: "", clusters: 0, items: 0, itemSources: [] };
   }
+  const itemSources = R.uniq(R.map((item: ReportItem) => item.source, items));
   const [evergreen, news] = R.partition(isEvergreen, items);
   const reading = worthAReadSection(evergreen);
   if (news.length === 0) {
-    return { body: reading, clusters: 0, items: items.length };
+    return { body: reading, clusters: 0, items: items.length, itemSources };
   }
   const clusters = clusterItems(news);
   const summaries = await sequentially(clusters, summarizeCluster);
@@ -233,7 +238,7 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
     SYNTHESIS_SYSTEM
   );
   const body = [synthesized, reading].filter((part) => part.length > 0).join("\n\n");
-  return { body, clusters: clusters.length, items: items.length };
+  return { body, clusters: clusters.length, items: items.length, itemSources };
 };
 
 export {

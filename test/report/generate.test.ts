@@ -34,7 +34,8 @@ const ITEM = {
   relationship: "regulatory",
   published_at: "2026-07-18",
   merged_urls: [],
-  content_kind: ""
+  content_kind: "",
+  source: "FINRA press releases"
 };
 
 const SUMMARIES = ["FINRA fined a broker-dealer over off-channel texting (https://example.com/finra)."];

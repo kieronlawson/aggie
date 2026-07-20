@@ -3,8 +3,9 @@ import { parseArgs } from "node:util";
 import { postMessage, postThreadReply, SlackChannel } from "#src/clients/slack.ts";
 import { queryRows, TpufNamespace } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
-import { Vertical } from "#src/registry/types.ts";
-import { appendStaticSections, splitDigest } from "#src/report/format.ts";
+import { loadActiveSources } from "#src/registry/read.ts";
+import { SourceKind, Vertical } from "#src/registry/types.ts";
+import { appendStaticSections, quietSources, splitDigest } from "#src/report/format.ts";
 import { generateDigestBody, upsertReport } from "#src/report/generate.ts";
 import { chunkForSlack, toMrkdwn } from "#src/report/mrkdwn.ts";
 
@@ -61,7 +62,13 @@ const main = async (): Promise<void> => {
     await postMessage(SlackChannel.IntelStaging, note);
     return;
   }
-  const digest = appendStaticSections(generated.body, []);
+  const feedSources = await loadActiveSources(SourceKind.Feed);
+  const crawlSources = await loadActiveSources(SourceKind.Crawl);
+  const registered = [...feedSources, ...crawlSources].filter((source) => source.vertical === vertical);
+  const quiet = quietSources(registered, generated.itemSources);
+  const footerNotes =
+    quiet.length > 0 ? [`Quiet sources this week (no relevant items — may be fine): ${quiet.join(" · ")}`] : [];
+  const digest = appendStaticSections(generated.body, footerNotes);
   const { card, thread } = splitDigest(digest);
   const header =
     `📡 *Aggie · ${vertical} · week of ${reportDate}* — ` +

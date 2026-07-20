@@ -97,20 +97,22 @@ const askText = async (model: string, maxTokens: number, prompt: string, system?
   return block.text;
 };
 
-const summarizeCluster = async (cluster: ReportItem[]): Promise<string> => {
-  const prompt = [
+const clusterSummaryPrompt = (cluster: ReportItem[]): string =>
+  [
     "Summarize this cluster of related intel items as ONE tight paragraph for an internal digest.",
-    "End the paragraph with the canonical source links in parentheses, primary link first.",
+    "End the paragraph with the canonical source links in parentheses, primary link first, each",
+    "written as a markdown link [publisher name](url) — e.g. [FINRA.org](https://www.finra.org/...)",
+    "— never a bare URL.",
     "",
     ...R.map(clusterLine, cluster)
   ].join("\n");
-  return askText(HAIKU_MODEL, SUMMARY_MAX_TOKENS, prompt);
-};
+
+const summarizeCluster = async (cluster: ReportItem[]): Promise<string> =>
+  askText(HAIKU_MODEL, SUMMARY_MAX_TOKENS, clusterSummaryPrompt(cluster));
 
 const SYNTHESIS_SYSTEM = [
   "You write Aggie, Spoke Phone's internal weekly intel digest. Spoke sells a cloud phone system",
   "with compliance call recording into regulated verticals (finance, insurance, healthcare).",
-  "Be factual and concise; plain language; no hype. Preserve source links exactly as given.",
   "",
   "Readers and how each uses intel:",
   "- Sales: talking points for deals in regulated verticals (enforcement actions, recordkeeping rules).",
@@ -118,27 +120,40 @@ const SYNTHESIS_SYSTEM = [
   "- Product: roadmap and compliance signals worth building toward.",
   "- Leadership: competitive posture and market shifts.",
   "",
-  "Partner-relationship items (Theta Lake, Smarsh) are opportunity, not threat."
+  "Partner-relationship items (Theta Lake, Smarsh) are opportunity, not threat.",
+  "",
+  "Aggie's voice: a sharp, well-read intel analyst who respects the reader's time — confident,",
+  "warm, occasionally wry. The lead-in should hook; signals stay punchy; Details paragraphs stay",
+  "plain and factual. Personality never bends facts: no invented details, no product hype, and",
+  "every link is preserved exactly as given, always as a markdown link [text](url), never a bare URL."
 ].join("\n");
 
 const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: string): string =>
   [
-    `Write this week's ${vertical} digest in markdown with exactly these sections:`,
-    "## This week's signals — the 2-3 most actionable stories, one bullet each formatted " +
-      "\"**<Role>:** <what to do with it>\" ending with the story link. Roles: Sales, Marketing, " +
-      'Product, Leadership. Write "Nothing requiring action this week." if no story is genuinely actionable.',
-    "## New this week — one paragraph per story cluster (use the cluster summaries below; keep their links). " +
+    `Write this week's ${vertical} digest in markdown with exactly these parts, in order:`,
+    "Lead-in — 1-2 sentences at the very top, no heading, in Aggie's voice: the week's sharpest " +
+      "takeaway as a hook that makes the reader want the rest.",
+    "## ⚡ Signals — the 2-3 most actionable stories, one bullet each formatted " +
+      "\"<emoji> **<Role>:** <situation> → <what to do about it>\" ending with the story link. " +
+      "Roles and emoji: 💼 Sales, 📣 Marketing, 🛠️ Product, 👔 Leadership. One line per bullet. " +
+      'Write "Nothing requiring action this week." if no story is genuinely actionable.',
+    "## 🆕 New this week — one bullet per new story cluster: \"**<short title>** — <one-line gist>\" " +
+      "ending with the story link. One line each; the full paragraphs belong in Details.",
+    "## Details — one paragraph per story cluster (use the cluster summaries below; keep their links). " +
       "When a story has a concrete use for a team, end its paragraph with an italic line " +
       "\"_Why it matters — **<Role>:** <one sentence>_\" (multiple role tags allowed). Omit the line for " +
-      'marginal stories — never write filler like "worth monitoring".',
-    "## Continuing stories — clusters that also appear in the previous digest; one sentence each on what changed. " +
-      'Write "None." if there are none.',
+      "marginal stories — never write filler.",
+    "## 🔁 Continuing stories — ONLY clusters that also appear in the previous digest AND have something " +
+      "new; one sentence each on what changed. If continuing stories exist but none changed, write a " +
+      "single line: \"<N> continuing stories, no changes — <title> · <title> · …\". " +
+      'Write "None." if there are no continuing stories.',
     vertical === Vertical.Competitor
       ? "## Competitor sections — one subsection per competitor with announcements, complaints, and signals. " +
         'Frame partner-relationship items (Theta Lake, Smarsh) as opportunity, adding a "Where we fit" line ' +
         "when a coverage gap appears."
       : "",
-    "Do not add any other sections (manual checks and footer are appended automatically).",
+    "Every link in your output must be a markdown link [text](url) — never a bare URL. " +
+      "Do not add any other sections (manual checks and footer are appended automatically).",
     "",
     "### Cluster summaries (this week)",
     ...R.map((summary: string) => `- ${summary}`, summaries),
@@ -198,6 +213,7 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
 };
 
 export {
+  clusterSummaryPrompt,
   fetchWeekItems,
   generateDigestBody,
   latestReportBody,

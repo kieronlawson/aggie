@@ -15,7 +15,7 @@ const appendStaticSections = (body: string, failedSources: string[]): string => 
   return [
     body.trim(),
     "",
-    "## Manual checks",
+    "## 🔎 Manual checks",
     "",
     ...R.map((check: string) => `- ${check}`, MANUAL_CHECKS),
     "",
@@ -25,4 +25,21 @@ const appendStaticSections = (body: string, failedSources: string[]): string => 
   ].join("\n");
 };
 
-export { appendStaticSections, MANUAL_CHECKS };
+/** Marker heading separating the channel card from the thread body. */
+const DETAILS_HEADING = "## Details";
+
+type SplitDigest = {
+  card: string;
+  thread: string;
+};
+
+/** Cuts the digest at DETAILS_HEADING; a missing marker degrades to card-less delivery. */
+const splitDigest = (body: string): SplitDigest => {
+  const markerIndex = body.indexOf(DETAILS_HEADING);
+  if (markerIndex === -1) {
+    return { card: "", thread: body.trim() };
+  }
+  return { card: body.slice(0, markerIndex).trim(), thread: body.slice(markerIndex).trim() };
+};
+
+export { appendStaticSections, DETAILS_HEADING, MANUAL_CHECKS, type SplitDigest, splitDigest };

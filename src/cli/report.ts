@@ -4,7 +4,7 @@ import { postMessage, postThreadReply, SlackChannel } from "#src/clients/slack.t
 import { queryRows, TpufNamespace } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { Vertical } from "#src/registry/types.ts";
-import { appendStaticSections } from "#src/report/format.ts";
+import { appendStaticSections, splitDigest } from "#src/report/format.ts";
 import { generateDigestBody, upsertReport } from "#src/report/generate.ts";
 import { chunkForSlack, toMrkdwn } from "#src/report/mrkdwn.ts";
 
@@ -31,10 +31,14 @@ const alreadyDelivered = async (vertical: Vertical, reportDate: string): Promise
   return rows.length > 0;
 };
 
-const deliverToSlack = async (header: string, digest: string): Promise<void> => {
-  const chunks = chunkForSlack(toMrkdwn(digest));
-  const threadTs = await postMessage(SlackChannel.IntelStaging, header);
-  await sequentially(chunks, async (chunk) => {
+const CARD_POINTER = "🧵 _Full digest in thread →_";
+
+const deliverToSlack = async (card: string, thread: string): Promise<void> => {
+  const cardChunks = chunkForSlack(toMrkdwn(card));
+  const threadChunks = chunkForSlack(toMrkdwn(thread));
+  const [first, ...cardOverflow] = cardChunks;
+  const threadTs = await postMessage(SlackChannel.IntelStaging, first ?? "");
+  await sequentially([...cardOverflow, ...threadChunks], async (chunk) => {
     await postThreadReply(SlackChannel.IntelStaging, threadTs, chunk);
   });
 };
@@ -58,10 +62,12 @@ const main = async (): Promise<void> => {
     return;
   }
   const digest = appendStaticSections(generated.body, []);
+  const { card, thread } = splitDigest(digest);
   const header =
-    `📰 *Aggie weekly digest — ${vertical} — ${reportDate}* ` +
-    `(${String(generated.items)} items in ${String(generated.clusters)} clusters) — digest in thread 🧵`;
-  await deliverToSlack(header, digest);
+    `📡 *Aggie · ${vertical} · week of ${reportDate}* — ` +
+    `${String(generated.items)} items · ${String(generated.clusters)} stories`;
+  const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
+  await deliverToSlack(cardText, thread);
   await upsertReport(vertical, reportDate, digest);
   console.log(`Digest for ${vertical} posted to #intel-staging (threaded) and upserted (${reportDate}).`);
 };

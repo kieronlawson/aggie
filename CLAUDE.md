@@ -83,7 +83,10 @@ Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
 - **Gotchas:** TurboPuffer rejects queries touching attributes absent from a namespace's schema —
   `queryRows` treats that as "no matches" (fresh namespace). Filterable attributes cap at 4KB
   (hence `body` non-filterable). `include_attributes: true` does not return vectors — list
-  `"vector"` explicitly.
+  `"vector"` explicitly. Adding an attribute to a query's `include_attributes` requires that
+  attribute to already exist in the namespace schema — declare it via the verify bootstrap
+  (`src/cli/verify.ts`, `bootstrapSchemaFor`) before the query ships, otherwise `queryRows`'
+  missing-attribute tolerance silently returns no rows.
 
 ### Phase 0 scaffold
 

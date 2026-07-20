@@ -3,7 +3,13 @@ import * as R from "ramda";
 import { HAIKU_MODEL, OPUS_MODEL, pingModel } from "#src/clients/anthropic.ts";
 import { remainingCredits } from "#src/clients/firecrawl.ts";
 import { authTest, postMessage, SlackChannel } from "#src/clients/slack.ts";
-import { ALL_NAMESPACES, listNamespaces, upsertRows } from "#src/clients/turbopuffer.ts";
+import {
+  ALL_NAMESPACES,
+  listNamespaces,
+  TpufNamespace,
+  type TpufSchema,
+  upsertRows
+} from "#src/clients/turbopuffer.ts";
 import { embed, EMBEDDING_MODEL } from "#src/clients/voyage.ts";
 
 type CheckResult = {
@@ -13,6 +19,22 @@ type CheckResult = {
 };
 
 const BOOTSTRAP_ROW_ID = "_bootstrap";
+
+const ITEMS_NAMESPACES: TpufNamespace[] = [
+  TpufNamespace.ItemsFinance,
+  TpufNamespace.ItemsInsurance,
+  TpufNamespace.ItemsHealthcare,
+  TpufNamespace.ItemsCompetitor
+];
+
+const CONTENT_KIND_SCHEMA: TpufSchema = { content_kind: { type: "string" } };
+
+/**
+ * Items namespaces must declare `content_kind` in schema before any report query includes it —
+ * queryRows' missing-attribute tolerance otherwise turns a real digest into a silent empty one.
+ */
+const bootstrapSchemaFor = (namespace: TpufNamespace): TpufSchema | undefined =>
+  R.includes(namespace, ITEMS_NAMESPACES) ? CONTENT_KIND_SCHEMA : undefined;
 
 const check = async (name: string, run: () => Promise<string>): Promise<CheckResult> => {
   try {
@@ -41,7 +63,12 @@ const bootstrapNamespaces = async (): Promise<string> => {
   }
   await Promise.all(
     R.map(
-      (namespace) => upsertRows(namespace, [{ id: BOOTSTRAP_ROW_ID, vector, kind: "bootstrap" }]),
+      (namespace) =>
+        upsertRows(
+          namespace,
+          [{ id: BOOTSTRAP_ROW_ID, vector, kind: "bootstrap" }],
+          bootstrapSchemaFor(namespace)
+        ),
       ALL_NAMESPACES
     )
   );

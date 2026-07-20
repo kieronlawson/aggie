@@ -114,5 +114,6 @@ export {
   TpufNamespace,
   type TpufResultRow,
   type TpufRow,
+  type TpufSchema,
   upsertRows
 };

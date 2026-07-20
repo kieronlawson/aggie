@@ -31,6 +31,7 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 | Federal Reserve enforcement actions | feed | — | https://www.federalreserve.gov/feeds/press_enforcement.xml |
 | OCC news releases | feed | — | https://www.occ.gov/rss/occ_news.xml |
 | FTC press releases | feed | — | https://www.ftc.gov/feeds/press-release.xml |
+| The Campaign Registry (10DLC/TCR) | feed | — | https://www.campaignregistry.com/feed/ |
 | Compliance Week | feed | — | https://www.complianceweek.com/rss |
 | Banking Dive | feed | — | https://www.bankingdive.com/feeds/news/ |
 | JD Supra — Securities Law | feed | — | https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=SecuritiesLaw&premium=1 |
@@ -39,6 +40,10 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 | Global Relay blog | feed | — | https://www.globalrelay.com/feed/ |
 | National Law Review — recent contributions | feed | — | https://www.natlawreview.com/recent-contributions/feed |
 | TCPAWorld (Troutman Amin) | feed | — | https://www.tcpaworld.com/feed/ |
+| Kelley Drye — Ad Law Access | feed | — | https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/rss |
+| Duane Morris — Class Action Defense | feed | — | https://blogs.duanemorris.com/classactiondefense/feed/ |
+| The CommLaw Group | feed | — | https://commlawgroup.com/feed/ |
+| DNC.com (Contact Center Compliance) | feed | — | https://www.dnc.com/blog/rss.xml |
 
 ### Crawl targets (Firecrawl change-tracking)
 
@@ -104,4 +109,5 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 - 8x8 pricing page returned 429 (Cloudflare rate limit) during verification — UNVERIFIED; expected to work through Firecrawl in phase 3.
 - Aircall publishes no blog RSS (their /feed URL serves an HTML app); coverage comes from their status feed, Lever job board, and pricing-page crawl.
 - Sources-v2 (2026-07-20): FTC press releases carry mostly non-telemarketing output — the relevance gate does the filtering. Banking Dive is high-volume general banking news; same reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md.
+- Sources-v3 keyword round (2026-07-20, TCPA/10DLC/DNC/TCR): Kelley Drye, Duane Morris, CommLaw Group, and DNC.com are commentary/vendor class — the evergreen split and relevance gate carry the filtering. The Campaign Registry feed is authoritative but sporadic (~months between posts); 10DLC carrier-policy trackers (Telgorithm, SIPNEX, MyTCRPlus, CTIA Principles page) are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md.
 

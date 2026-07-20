@@ -56,7 +56,8 @@ const REGULATOR_FEEDS: SourceRecord[] = [
   financeFeedV2("CFPB newsroom", "https://www.consumerfinance.gov/about-us/newsroom/feed/"),
   financeFeedV2("Federal Reserve enforcement actions", "https://www.federalreserve.gov/feeds/press_enforcement.xml"),
   financeFeedV2("OCC news releases", "https://www.occ.gov/rss/occ_news.xml"),
-  financeFeedV2("FTC press releases", "https://www.ftc.gov/feeds/press-release.xml")
+  financeFeedV2("FTC press releases", "https://www.ftc.gov/feeds/press-release.xml"),
+  financeFeedV2("The Campaign Registry (10DLC/TCR)", "https://www.campaignregistry.com/feed/")
 ];
 
 const TRADE_PRESS_FEEDS: SourceRecord[] = [
@@ -70,7 +71,11 @@ const COMMENTARY_FEEDS: SourceRecord[] = [
   financeFeed("Radical Compliance", "https://www.radicalcompliance.com/feed/"),
   financeFeed("Global Relay blog", "https://www.globalrelay.com/feed/"),
   financeFeed("National Law Review — recent contributions", "https://www.natlawreview.com/recent-contributions/feed"),
-  financeFeedV2("TCPAWorld (Troutman Amin)", "https://www.tcpaworld.com/feed/")
+  financeFeedV2("TCPAWorld (Troutman Amin)", "https://www.tcpaworld.com/feed/"),
+  financeFeedV2("Kelley Drye — Ad Law Access", "https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/rss"),
+  financeFeedV2("Duane Morris — Class Action Defense", "https://blogs.duanemorris.com/classactiondefense/feed/"),
+  financeFeedV2("The CommLaw Group", "https://commlawgroup.com/feed/"),
+  financeFeedV2("DNC.com (Contact Center Compliance)", "https://www.dnc.com/blog/rss.xml")
 ];
 
 const COMPETITOR_FEEDS: SourceRecord[] = [
@@ -153,7 +158,12 @@ const SEED_NOTES: string[] = [
     "relevance gate does the filtering. Banking Dive is high-volume general banking news; same " +
     "reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest " +
     "robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); " +
-    "ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md."
+    "ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md.",
+  "Sources-v3 keyword round (2026-07-20, TCPA/10DLC/DNC/TCR): Kelley Drye, Duane Morris, CommLaw " +
+    "Group, and DNC.com are commentary/vendor class — the evergreen split and relevance gate carry " +
+    "the filtering. The Campaign Registry feed is authoritative but sporadic (~months between " +
+    "posts); 10DLC carrier-policy trackers (Telgorithm, SIPNEX, MyTCRPlus, CTIA Principles page) " +
+    "are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md."
 ];
 
 export { SEED_COMPETITORS, SEED_NOTES, SEED_SOURCES };

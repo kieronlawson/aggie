@@ -33,12 +33,18 @@ const slackCall = async (method: string, body: Record<string, unknown>): Promise
 };
 
 const postMessage = async (channel: SlackChannel, text: string): Promise<string> => {
-  const payload = await slackCall("chat.postMessage", { channel, text });
+  const payload = await slackCall("chat.postMessage", { channel, text, unfurl_links: false, unfurl_media: false });
   return payload.ts ?? "";
 };
 
 const postThreadReply = async (channel: SlackChannel, threadTs: string, text: string): Promise<void> => {
-  await slackCall("chat.postMessage", { channel, text, thread_ts: threadTs });
+  await slackCall("chat.postMessage", {
+    channel,
+    text,
+    thread_ts: threadTs,
+    unfurl_links: false,
+    unfurl_media: false
+  });
 };
 
 const authTest = async (): Promise<string> => {

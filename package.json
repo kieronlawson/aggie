@@ -16,7 +16,7 @@
     "crawl": "node --env-file-if-exists=.env --import tsx src/cli/crawl.ts",
     "report": "node --env-file-if-exists=.env --import tsx src/cli/report.ts",
     "registry": "node --env-file-if-exists=.env --import tsx src/cli/registry.ts",
-    "restore-competitive": "node --env-file-if-exists=.env --import tsx src/cli/restore-competitive.ts",
+    "reset-competitor-report": "node --env-file-if-exists=.env --import tsx src/cli/reset-competitor-report.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

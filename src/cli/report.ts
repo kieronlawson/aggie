@@ -8,15 +8,9 @@ import { sequentially } from "#src/lib/async.ts";
 import { loadActiveSources } from "#src/registry/read.ts";
 import { sourcedVerticals } from "#src/registry/records.ts";
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
-import {
-  appendStaticSections,
-  type DigestCounts,
-  digestHeader,
-  quietSources,
-  splitDigest
-} from "#src/report/format.ts";
+import { type DigestCounts, type DigestMessages, digestMessages } from "#src/report/blocks.ts";
+import { appendStaticSections, quietSources } from "#src/report/format.ts";
 import { generateDigestBody, upsertReport } from "#src/report/generate.ts";
-import { chunkForSlack, toMrkdwn } from "#src/report/mrkdwn.ts";
 
 const VERTICALS: string[] = Object.values(Vertical);
 const DATE_LENGTH = 10;
@@ -56,8 +50,6 @@ const storedReport = async (vertical: Vertical, reportDate: string): Promise<Sto
   };
 };
 
-const CARD_POINTER = "🧵 _Full digest in thread →_";
-
 /**
  * Promotion map: a vertical's digest moves out of staging when its gate passes.
  * Competitor promoted 2026-07-24 (Kieron); ops posts (📭/❌) always stay in staging.
@@ -65,13 +57,10 @@ const CARD_POINTER = "🧵 _Full digest in thread →_";
 const channelFor = (vertical: Vertical): SlackChannel =>
   vertical === Vertical.Competitor ? SlackChannel.IntelCompetitive : SlackChannel.IntelStaging;
 
-const deliverToSlack = async (channel: SlackChannel, card: string, thread: string): Promise<void> => {
-  const cardChunks = chunkForSlack(toMrkdwn(card));
-  const threadChunks = chunkForSlack(toMrkdwn(thread));
-  const [first, ...cardOverflow] = cardChunks;
-  const threadTs = await postMessage(channel, first ?? "");
-  await sequentially([...cardOverflow, ...threadChunks], async (chunk) => {
-    await postThreadReply(channel, threadTs, chunk);
+const deliverToSlack = async (channel: SlackChannel, { card, replies }: DigestMessages): Promise<void> => {
+  const threadTs = await postMessage(channel, card.text, card.blocks);
+  await sequentially(replies, async (reply) => {
+    await postThreadReply({ channel, threadTs, text: reply.text, blocks: reply.blocks });
   });
 };
 
@@ -86,11 +75,9 @@ type ReportVerticalOpts = {
 
 /** Re-delivers the digest exactly as first generated — a force re-run never rewrites content. */
 const repostStored = async (vertical: Vertical, reportDate: string, stored: StoredReport): Promise<void> => {
-  const { card, thread } = splitDigest(stored.body);
-  const header = digestHeader(vertical, reportDate, stored.counts);
-  const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
+  const messages = digestMessages({ vertical, reportDate, counts: stored.counts }, stored.body);
   const channel = channelFor(vertical);
-  await deliverToSlack(channel, cardText, thread);
+  await deliverToSlack(channel, messages);
   console.log(`Stored digest for ${vertical} (${reportDate}) reposted to ${channel} — not regenerated.`);
 };
 
@@ -116,11 +103,10 @@ const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVe
   const footerNotes =
     quiet.length > 0 ? [`Quiet sources this week (no relevant items — may be fine): ${quiet.join(" · ")}`] : [];
   const digest = appendStaticSections(generated.body, footerNotes);
-  const { card, thread } = splitDigest(digest);
-  const header = digestHeader(vertical, reportDate, { items: generated.items, clusters: generated.clusters });
-  const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
+  const counts = { items: generated.items, clusters: generated.clusters };
+  const messages = digestMessages({ vertical, reportDate, counts }, digest);
   const channel = channelFor(vertical);
-  await deliverToSlack(channel, cardText, thread);
+  await deliverToSlack(channel, messages);
   await upsertReport({ vertical, reportDate, body: digest, items: generated.items, clusters: generated.clusters });
   console.log(`Digest for ${vertical} posted to ${channel} (threaded) and upserted (${reportDate}).`);
 };

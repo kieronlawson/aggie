@@ -32,10 +32,22 @@ describe("slack client unfurl suppression", () => {
     vi.stubEnv("SLACK_BOT_TOKEN", "xoxb-test");
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal("fetch", fetchMock);
-    await postThreadReply(SlackChannel.IntelStaging, "123.456", "reply");
+    await postThreadReply({ channel: SlackChannel.IntelStaging, threadTs: "123.456", text: "reply" });
     const body = lastRequestBody(fetchMock);
     expect(body["unfurl_links"]).toBe(false);
     expect(body["unfurl_media"]).toBe(false);
     expect(body["thread_ts"]).toBe("123.456");
+    expect(body["blocks"]).toBeUndefined();
+  });
+
+  it("passes blocks through alongside the fallback text when provided", async () => {
+    vi.stubEnv("SLACK_BOT_TOKEN", "xoxb-test");
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const blocks = [{ type: "divider" }];
+    await postMessage(SlackChannel.IntelStaging, "fallback", blocks);
+    const body = lastRequestBody(fetchMock);
+    expect(body["blocks"]).toEqual(blocks);
+    expect(body["text"]).toBe("fallback");
   });
 });

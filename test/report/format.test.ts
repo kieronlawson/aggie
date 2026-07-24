@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
-import {
-  appendStaticSections,
-  DETAILS_HEADING,
-  digestHeader,
-  MANUAL_CHECKS,
-  quietSources,
-  splitDigest
-} from "#src/report/format.ts";
+import { appendStaticSections, MANUAL_CHECKS, quietSources } from "#src/report/format.ts";
 
 const source = (overrides: Partial<SourceRecord> = {}): SourceRecord => ({
   kind: SourceKind.Feed,
@@ -61,43 +54,5 @@ describe("quietSources", () => {
   it("never lists an inactive source", () => {
     const sources = [source({ name: "Retired feed", active: false })];
     expect(quietSources(sources, [])).toEqual([]);
-  });
-});
-
-describe("digestHeader", () => {
-  it("includes item and story counts when present", () => {
-    expect(digestHeader(Vertical.Competitor, "2026-07-24", { items: 43, clusters: 14 })).toBe(
-      "📡 *Aggie · competitor · week of 2026-07-24* — 43 items · 14 stories"
-    );
-  });
-
-  it("omits counts for stored digests written before counts were recorded", () => {
-    expect(digestHeader(Vertical.Competitor, "2026-07-24")).toBe("📡 *Aggie · competitor · week of 2026-07-24*");
-  });
-});
-
-describe("splitDigest", () => {
-  it("splits card from thread at the Details heading", () => {
-    const body = "Lead-in.\n\n## ⚡ Signals\n\n- bullet\n\n## Details\n\nStory paragraph.\n\n## 🔁 Continuing stories\n\nNone.";
-    const { card, thread } = splitDigest(body);
-    expect(card).toContain("Lead-in.");
-    expect(card).toContain("## ⚡ Signals");
-    expect(card).not.toContain("## Details");
-    expect(thread.startsWith(DETAILS_HEADING)).toBe(true);
-    expect(thread).toContain("## 🔁 Continuing stories");
-  });
-
-  it("returns an empty card when the marker is missing", () => {
-    const { card, thread } = splitDigest("just a body with no marker");
-    expect(card).toBe("");
-    expect(thread).toBe("just a body with no marker");
-  });
-
-  it("keeps static sections thread-side after appendStaticSections", () => {
-    const digest = appendStaticSections("Lead.\n\n## Details\n\nStory.", []);
-    const { card, thread } = splitDigest(digest);
-    expect(card).not.toContain("Manual checks");
-    expect(thread).toContain("## 🔎 Manual checks");
-    expect(thread).toContain("## Footer");
   });
 });

@@ -32,18 +32,35 @@ const slackCall = async (method: string, body: Record<string, unknown>): Promise
   return payload;
 };
 
-const postMessage = async (channel: SlackChannel, text: string): Promise<string> => {
-  const payload = await slackCall("chat.postMessage", { channel, text, unfurl_links: false, unfurl_media: false });
+type SlackBlock = Record<string, unknown>;
+
+/** `text` doubles as the notification fallback when `blocks` are provided. */
+const postMessage = async (channel: SlackChannel, text: string, blocks?: SlackBlock[]): Promise<string> => {
+  const payload = await slackCall("chat.postMessage", {
+    channel,
+    text,
+    unfurl_links: false,
+    unfurl_media: false,
+    ...(blocks === undefined ? {} : { blocks })
+  });
   return payload.ts ?? "";
 };
 
-const postThreadReply = async (channel: SlackChannel, threadTs: string, text: string): Promise<void> => {
+type ThreadReplyOpts = {
+  channel: SlackChannel;
+  threadTs: string;
+  text: string;
+  blocks?: SlackBlock[];
+};
+
+const postThreadReply = async ({ channel, threadTs, text, blocks }: ThreadReplyOpts): Promise<void> => {
   await slackCall("chat.postMessage", {
     channel,
     text,
     thread_ts: threadTs,
     unfurl_links: false,
-    unfurl_media: false
+    unfurl_media: false,
+    ...(blocks === undefined ? {} : { blocks })
   });
 };
 
@@ -52,4 +69,4 @@ const authTest = async (): Promise<string> => {
   return `team ${payload.team ?? "?"}, bot ${payload.user ?? "?"}`;
 };
 
-export { authTest, postMessage, postThreadReply, SlackChannel };
+export { authTest, postMessage, postThreadReply, type SlackBlock, SlackChannel };

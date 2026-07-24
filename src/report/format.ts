@@ -36,43 +36,4 @@ const appendStaticSections = (body: string, failedSources: string[]): string => 
   ].join("\n");
 };
 
-type DigestCounts = {
-  items: number;
-  clusters: number;
-};
-
-/** Card header; counts are absent on stored digests written before counts were recorded. */
-const digestHeader = (vertical: string, reportDate: string, counts?: DigestCounts): string => {
-  const base = `📡 *Aggie · ${vertical} · week of ${reportDate}*`;
-  return counts === undefined
-    ? base
-    : `${base} — ${String(counts.items)} items · ${String(counts.clusters)} stories`;
-};
-
-/** Marker heading separating the channel card from the thread body. */
-const DETAILS_HEADING = "## Details";
-
-type SplitDigest = {
-  card: string;
-  thread: string;
-};
-
-/** Cuts the digest at DETAILS_HEADING; a missing marker degrades to card-less delivery. */
-const splitDigest = (body: string): SplitDigest => {
-  const markerIndex = body.indexOf(DETAILS_HEADING);
-  if (markerIndex === -1) {
-    return { card: "", thread: body.trim() };
-  }
-  return { card: body.slice(0, markerIndex).trim(), thread: body.slice(markerIndex).trim() };
-};
-
-export {
-  appendStaticSections,
-  DETAILS_HEADING,
-  type DigestCounts,
-  digestHeader,
-  MANUAL_CHECKS,
-  quietSources,
-  type SplitDigest,
-  splitDigest
-};
+export { appendStaticSections, MANUAL_CHECKS, quietSources };

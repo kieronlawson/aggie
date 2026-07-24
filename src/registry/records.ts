@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import * as R from "ramda";
 
 import { type TpufRow } from "#src/clients/turbopuffer.ts";
-import { type CompetitorRecord, type SourceRecord } from "#src/registry/types.ts";
+import { type CompetitorRecord, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 /** Must match the embedding dimension used across all namespaces (voyage-4 default). */
 const REGISTRY_VECTOR_DIMS = 1024;
@@ -53,6 +53,13 @@ const sourceToRow = (record: SourceRecord): TpufRow => ({
   added_at: record.added_at
 });
 
+/** Verticals with at least one source, in Vertical declaration order (digest delivery order). */
+const sourcedVerticals = (sources: SourceRecord[]): Vertical[] =>
+  R.filter(
+    (vertical: Vertical) => R.any((source: SourceRecord) => source.vertical === vertical, sources),
+    Object.values(Vertical)
+  );
+
 const isValidUrl = (value: string): boolean => URL.canParse(value);
 
 const validateRegistry = (competitors: CompetitorRecord[], sources: SourceRecord[]): string[] => {
@@ -80,4 +87,13 @@ const validateRegistry = (competitors: CompetitorRecord[], sources: SourceRecord
   return [...duplicateCompetitors, ...duplicateUrls, ...unknownCompetitors, ...badUrls];
 };
 
-export { competitorId, competitorToRow, dummyVector, RecordType, sourceId, sourceToRow, validateRegistry };
+export {
+  competitorId,
+  competitorToRow,
+  dummyVector,
+  RecordType,
+  sourcedVerticals,
+  sourceId,
+  sourceToRow,
+  validateRegistry
+};

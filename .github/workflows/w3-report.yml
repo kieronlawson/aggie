@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       vertical:
-        description: "Vertical to report on (empty = finance)"
+        description: "Vertical to report on (empty = every vertical with registered sources)"
         required: false
         type: choice
         default: finance

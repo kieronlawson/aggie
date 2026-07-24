@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { competitorId, competitorToRow, dummyVector, sourceId, sourceToRow, validateRegistry } from "#src/registry/records.ts";
+import { competitorId, competitorToRow, dummyVector, sourcedVerticals, sourceId, sourceToRow, validateRegistry } from "#src/registry/records.ts";
 import { type CompetitorRecord, Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 const competitor = (overrides: Partial<CompetitorRecord> = {}): CompetitorRecord => ({
@@ -59,6 +59,31 @@ describe("row conversion", () => {
     expect(row["record_type"]).toBe("source");
     expect(row["kind"]).toBe("feed");
     expect(row["competitor"]).toBe("RingCentral");
+  });
+});
+
+describe("sourcedVerticals", () => {
+  it("returns no verticals for an empty source list", () => {
+    expect(sourcedVerticals([])).toEqual([]);
+  });
+
+  it("returns each vertical once, in enum declaration order, regardless of source order", () => {
+    const sources = [
+      source({ url: "https://c.example", vertical: Vertical.Competitor }),
+      source({ url: "https://f1.example", vertical: Vertical.Finance }),
+      source({ url: "https://f2.example", vertical: Vertical.Finance })
+    ];
+    expect(sourcedVerticals(sources)).toEqual([Vertical.Finance, Vertical.Competitor]);
+  });
+
+  it("includes every vertical once all are sourced", () => {
+    const sources = Object.values(Vertical).map((vertical) => source({ url: `https://${vertical}.example`, vertical }));
+    expect(sourcedVerticals(sources.toReversed())).toEqual([
+      Vertical.Finance,
+      Vertical.Insurance,
+      Vertical.Healthcare,
+      Vertical.Competitor
+    ]);
   });
 });
 

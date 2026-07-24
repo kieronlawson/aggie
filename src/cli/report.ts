@@ -1,10 +1,13 @@
 import { parseArgs } from "node:util";
 
+import * as R from "ramda";
+
 import { postMessage, postThreadReply, SlackChannel } from "#src/clients/slack.ts";
 import { queryRows, TpufNamespace } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { loadActiveSources } from "#src/registry/read.ts";
-import { SourceKind, Vertical } from "#src/registry/types.ts";
+import { sourcedVerticals } from "#src/registry/records.ts";
+import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 import { appendStaticSections, quietSources, splitDigest } from "#src/report/format.ts";
 import { generateDigestBody, upsertReport } from "#src/report/generate.ts";
 import { chunkForSlack, toMrkdwn } from "#src/report/mrkdwn.ts";
@@ -13,9 +16,6 @@ const VERTICALS: string[] = Object.values(Vertical);
 const DATE_LENGTH = 10;
 
 const parseVertical = (value: string): Vertical => {
-  if (value.length === 0) {
-    return Vertical.Finance;
-  }
   if (!VERTICALS.includes(value)) {
     throw new Error(`Unknown vertical "${value}" — expected one of: ${VERTICALS.join(", ")}`);
   }
@@ -46,11 +46,14 @@ const deliverToSlack = async (card: string, thread: string): Promise<void> => {
 
 const TRUE_FLAG = "true";
 
-const main = async (): Promise<void> => {
-  const { values } = parseArgs({ options: { vertical: { type: "string" }, force: { type: "string" } } });
-  const vertical = parseVertical(values.vertical ?? "");
-  const force = values.force === TRUE_FLAG;
-  const reportDate = new Date().toISOString().slice(0, DATE_LENGTH);
+type ReportVerticalOpts = {
+  vertical: Vertical;
+  force: boolean;
+  reportDate: string;
+  sources: SourceRecord[];
+};
+
+const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVerticalOpts): Promise<void> => {
   if (!force && (await alreadyDelivered(vertical, reportDate))) {
     console.log(`Digest for ${vertical} on ${reportDate} already delivered — skipping (idempotent re-run).`);
     return;
@@ -62,9 +65,7 @@ const main = async (): Promise<void> => {
     await postMessage(SlackChannel.IntelStaging, note);
     return;
   }
-  const feedSources = await loadActiveSources(SourceKind.Feed);
-  const crawlSources = await loadActiveSources(SourceKind.Crawl);
-  const registered = [...feedSources, ...crawlSources].filter((source) => source.vertical === vertical);
+  const registered = R.filter((source: SourceRecord) => source.vertical === vertical, sources);
   const quiet = quietSources(registered, generated.itemSources);
   const footerNotes =
     quiet.length > 0 ? [`Quiet sources this week (no relevant items — may be fine): ${quiet.join(" · ")}`] : [];
@@ -77,6 +78,35 @@ const main = async (): Promise<void> => {
   await deliverToSlack(cardText, thread);
   await upsertReport(vertical, reportDate, digest);
   console.log(`Digest for ${vertical} posted to #intel-staging (threaded) and upserted (${reportDate}).`);
+};
+
+/** One vertical's failure must not block the rest — collect it for the single ❌ post. */
+const reportVerticalSafely = async (opts: ReportVerticalOpts): Promise<string> => {
+  try {
+    await reportVertical(opts);
+    return "";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `${opts.vertical}: ${detail}`;
+  }
+};
+
+const main = async (): Promise<void> => {
+  const { values } = parseArgs({ options: { vertical: { type: "string" }, force: { type: "string" } } });
+  const requested = values.vertical ?? "";
+  const force = values.force === TRUE_FLAG;
+  const reportDate = new Date().toISOString().slice(0, DATE_LENGTH);
+  const feedSources = await loadActiveSources(SourceKind.Feed);
+  const crawlSources = await loadActiveSources(SourceKind.Crawl);
+  const sources = [...feedSources, ...crawlSources];
+  const verticals = requested.length === 0 ? sourcedVerticals(sources) : [parseVertical(requested)];
+  const outcomes = await sequentially(verticals, (vertical) =>
+    reportVerticalSafely({ vertical, force, reportDate, sources })
+  );
+  const failures = R.reject(R.isEmpty, outcomes);
+  if (failures.length > 0) {
+    throw new Error(failures.join("; "));
+  }
 };
 
 await main().catch(async (error: unknown) => {

@@ -3,12 +3,18 @@ import { parseArgs } from "node:util";
 import * as R from "ramda";
 
 import { postMessage, postThreadReply, SlackChannel } from "#src/clients/slack.ts";
-import { queryRows, TpufNamespace } from "#src/clients/turbopuffer.ts";
+import { queryRows, TpufNamespace, type TpufResultRow } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { loadActiveSources } from "#src/registry/read.ts";
 import { sourcedVerticals } from "#src/registry/records.ts";
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
-import { appendStaticSections, quietSources, splitDigest } from "#src/report/format.ts";
+import {
+  appendStaticSections,
+  type DigestCounts,
+  digestHeader,
+  quietSources,
+  splitDigest
+} from "#src/report/format.ts";
 import { generateDigestBody, upsertReport } from "#src/report/generate.ts";
 import { chunkForSlack, toMrkdwn } from "#src/report/mrkdwn.ts";
 
@@ -22,14 +28,32 @@ const parseVertical = (value: string): Vertical => {
   return value as Vertical;
 };
 
-const alreadyDelivered = async (vertical: Vertical, reportDate: string): Promise<boolean> => {
+type StoredReport = {
+  body: string;
+  counts: DigestCounts | undefined;
+};
+
+const countOf = (row: TpufResultRow, key: string): number | undefined => {
+  const value = row[key];
+  return typeof value === "number" ? value : undefined;
+};
+
+const storedReport = async (vertical: Vertical, reportDate: string): Promise<StoredReport | undefined> => {
   const rows = await queryRows({
     namespace: TpufNamespace.Reports,
     filters: ["id", "Eq", `report:${vertical}:${reportDate}`],
-    topK: 1,
-    includeAttributes: ["report_date"]
+    topK: 1
   });
-  return rows.length > 0;
+  const row = rows[0];
+  if (row === undefined) {
+    return undefined;
+  }
+  const items = countOf(row, "items");
+  const clusters = countOf(row, "clusters");
+  return {
+    body: typeof row["body"] === "string" ? row["body"] : "",
+    counts: items === undefined || clusters === undefined ? undefined : { items, clusters }
+  };
 };
 
 const CARD_POINTER = "🧵 _Full digest in thread →_";
@@ -60,9 +84,24 @@ type ReportVerticalOpts = {
   sources: SourceRecord[];
 };
 
+/** Re-delivers the digest exactly as first generated — a force re-run never rewrites content. */
+const repostStored = async (vertical: Vertical, reportDate: string, stored: StoredReport): Promise<void> => {
+  const { card, thread } = splitDigest(stored.body);
+  const header = digestHeader(vertical, reportDate, stored.counts);
+  const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
+  const channel = channelFor(vertical);
+  await deliverToSlack(channel, cardText, thread);
+  console.log(`Stored digest for ${vertical} (${reportDate}) reposted to ${channel} — not regenerated.`);
+};
+
 const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVerticalOpts): Promise<void> => {
-  if (!force && (await alreadyDelivered(vertical, reportDate))) {
+  const stored = await storedReport(vertical, reportDate);
+  if (stored !== undefined && !force) {
     console.log(`Digest for ${vertical} on ${reportDate} already delivered — skipping (idempotent re-run).`);
+    return;
+  }
+  if (stored !== undefined) {
+    await repostStored(vertical, reportDate, stored);
     return;
   }
   const generated = await generateDigestBody(vertical);
@@ -78,13 +117,11 @@ const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVe
     quiet.length > 0 ? [`Quiet sources this week (no relevant items — may be fine): ${quiet.join(" · ")}`] : [];
   const digest = appendStaticSections(generated.body, footerNotes);
   const { card, thread } = splitDigest(digest);
-  const header =
-    `📡 *Aggie · ${vertical} · week of ${reportDate}* — ` +
-    `${String(generated.items)} items · ${String(generated.clusters)} stories`;
+  const header = digestHeader(vertical, reportDate, { items: generated.items, clusters: generated.clusters });
   const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
   const channel = channelFor(vertical);
   await deliverToSlack(channel, cardText, thread);
-  await upsertReport(vertical, reportDate, digest);
+  await upsertReport({ vertical, reportDate, body: digest, items: generated.items, clusters: generated.clusters });
   console.log(`Digest for ${vertical} posted to ${channel} (threaded) and upserted (${reportDate}).`);
 };
 

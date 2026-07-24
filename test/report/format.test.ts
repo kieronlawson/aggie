@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
-import { appendStaticSections, DETAILS_HEADING, MANUAL_CHECKS, quietSources, splitDigest } from "#src/report/format.ts";
+import {
+  appendStaticSections,
+  DETAILS_HEADING,
+  digestHeader,
+  MANUAL_CHECKS,
+  quietSources,
+  splitDigest
+} from "#src/report/format.ts";
 
 const source = (overrides: Partial<SourceRecord> = {}): SourceRecord => ({
   kind: SourceKind.Feed,
@@ -54,6 +61,18 @@ describe("quietSources", () => {
   it("never lists an inactive source", () => {
     const sources = [source({ name: "Retired feed", active: false })];
     expect(quietSources(sources, [])).toEqual([]);
+  });
+});
+
+describe("digestHeader", () => {
+  it("includes item and story counts when present", () => {
+    expect(digestHeader(Vertical.Competitor, "2026-07-24", { items: 43, clusters: 14 })).toBe(
+      "📡 *Aggie · competitor · week of 2026-07-24* — 43 items · 14 stories"
+    );
+  });
+
+  it("omits counts for stored digests written before counts were recorded", () => {
+    expect(digestHeader(Vertical.Competitor, "2026-07-24")).toBe("📡 *Aggie · competitor · week of 2026-07-24*");
   });
 });
 

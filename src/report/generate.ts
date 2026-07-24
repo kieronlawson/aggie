@@ -197,7 +197,15 @@ const latestReportBody = async (vertical: Vertical): Promise<string> => {
   return row === undefined ? "" : str(row, "body");
 };
 
-const upsertReport = async (vertical: Vertical, reportDate: string, body: string): Promise<void> => {
+type UpsertReportOpts = {
+  vertical: Vertical;
+  reportDate: string;
+  body: string;
+  items: number;
+  clusters: number;
+};
+
+const upsertReport = async ({ vertical, reportDate, body, items, clusters }: UpsertReportOpts): Promise<void> => {
   const vectors = await embed([body], "document");
   const vector = vectors[0];
   if (vector === undefined) {
@@ -205,7 +213,7 @@ const upsertReport = async (vertical: Vertical, reportDate: string, body: string
   }
   await upsertRows(
     TpufNamespace.Reports,
-    [{ id: `report:${vertical}:${reportDate}`, vector, vertical, report_date: reportDate, body }],
+    [{ id: `report:${vertical}:${reportDate}`, vector, vertical, report_date: reportDate, body, items, clusters }],
     { body: { type: "string", filterable: false } }
   );
 };

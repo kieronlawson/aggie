@@ -14,7 +14,7 @@ on:
           - healthcare
           - competitor
       force:
-        description: "Regenerate and re-post even if today's digest was already delivered"
+        description: "Re-post today's digest even if already delivered (reposts the stored digest verbatim; generates only if none is stored)"
         required: false
         type: choice
         default: "false"

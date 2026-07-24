@@ -40,85 +40,6 @@ a phase before the previous gate has passed.
 - Respect the spec's non-goals: no UI, no auth, no scraping of G2/Capterra/LinkedIn, no real-time
   pipeline, no services beyond Firecrawl, TurboPuffer, GitHub, Anthropic, and Voyage.
 
-## Architecture (once built)
-
-One TypeScript repository. TurboPuffer holds **all** state (items per vertical, `registry`,
-`reports` namespaces — there is no other database or seen-URL store); GitHub Actions is compute
-only; Firecrawl is fetch only. Every workflow is reproducible locally with the same CLI command
-and a `.env` file.
-
-- **P — processing pipeline** (`src/pipeline/`, a library, not a workflow): normalize → hash →
-  classify (Claude Haiku, single call) → embed (Voyage) → three-layer dedupe (exact
-  `content_hash`; embedding neighbour ≥ 0.90 similarity arbitrated by a Haiku call returning
-  duplicate/same_story/distinct; canonical-URL selection on merge) → upsert. Complaint/outage
-  items at or above the sentiment threshold also alert to Slack immediately.
-- **W0 — registry editor** (`workflow_dispatch`): typed form inputs → CLI flags; validates
-  competitor names before writing. The registry is edited only through W0.
-- **W1 — feed ingest** (daily cron): feeds + job boards → seen-URL filter → P.
-- **W2 — crawl** (weekly cron): Firecrawl change-tracking jobs, polled to completion in-run;
-  classification runs on the diff plus page context.
-- **W3 — weekly report** (Sunday cron, per vertical + competitor): cluster (shared `story_id`
-  first, then embedding), Haiku per-cluster summaries, one Claude Opus synthesis pass with the
-  previous report (from the `reports` namespace) in context, then deliver and upsert.
-
-Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
-`.github/workflows/{w0-registry,w1-ingest,w2-crawl,w3-report}.yml`.
-
-## What exists today (phase 0 + phase 1)
-
-- **P pipeline** (`src/pipeline/`): `process.ts` orchestrates normalize → hash → layer-1 exact
-  dedupe → Haiku classify (structured output) → Voyage embed → layer-2 neighbour arbitration
-  (≥0.90, Haiku verdict duplicate/same_story/distinct, unparseable ⇒ distinct) → layer-3
-  canonical merge (`ORIGINATING_DOMAINS` beat syndicators) → upsert. Item ids are
-  `item:<sha16(url)>`; rows carry `published_at_ms` (uint) for range filters and `content_kind`
-  (news/evergreen; evergreen surfaces once in the digest's Worth-a-read section, never as
-  stories).
-- **W1 ingest** (`src/cli/ingest.ts`, daily cron): feeds only; declared-contact UA; malformed-XML
-  sanitize fallback; Firecrawl `scrapeRaw` fallback for bot-blocked hosts; seen-URL filter;
-  14-day age cutoff (first run = backfill). Per-source failures post as ⚠️ to staging.
-- **W3 report** (`src/cli/report.ts`, Sunday 06:00 UTC): trailing 7 days → cluster (story_id then
-  centroid ≥0.85) → Haiku summaries → Opus synthesis with previous report → static
-  manual-checks/footer sections → **mrkdwn conversion + threaded Slack delivery** (never post raw
-  markdown to Slack) → report upsert (`body` must stay non-filterable). Same-day re-runs skip.
-- **W0 registry**: `seed | export | add-competitor | add-source | set-source-active`; workflow
-  inputs flow through env vars (zizmor: never interpolate inputs into `run:`).
-- **Gotchas:** TurboPuffer rejects queries touching attributes absent from a namespace's schema —
-  `queryRows` treats that as "no matches" (fresh namespace). Filterable attributes cap at 4KB
-  (hence `body` non-filterable). `include_attributes: true` does not return vectors — list
-  `"vector"` explicitly. Adding an attribute to a query's `include_attributes` requires that
-  attribute to already exist in the namespace schema — declare it via the verify bootstrap
-  (`src/cli/verify.ts`, `bootstrapSchemaFor`) before the query ships, otherwise `queryRows`'
-  missing-attribute tolerance silently returns no rows.
-
-### Phase 0 scaffold
-
-- **Scaffold:** Node 22 ESM TypeScript run via `tsx` (no build step); ESLint flat config enforces
-  the spoke-fp rules; vitest; exact-pinned deps; `#src/*` subpath imports (never relative `..`).
-- **Clients** (`src/clients/`): `slack.ts` (fetch; `SlackChannel` enum), `anthropic.ts`
-  (`@anthropic-ai/sdk`; `claude-haiku-4-5` + `claude-opus-4-8`), `voyage.ts` (fetch; `voyage-4`,
-  1024 dims), `turbopuffer.ts` (`@turbopuffer/turbopuffer`; `TpufNamespace` enum; region from
-  `TURBOPUFFER_REGION`, default `gcp-us-central1`), `firecrawl.ts` (fetch, v2 API).
-- **Registry** (`src/registry/`): types, TurboPuffer row conversion (`competitor:<slug>` /
-  `source:<url-hash>` ids, `record_type` attribute, 1024-dim dummy vector), validation, seed data
-  (`seed.ts`), markdown export. Seeded to the `registry` namespace on 2026-07-17 (7 competitors,
-  41 sources). `docs/sources-v1.md` is generated — edit `src/registry/seed.ts` and re-export,
-  never the doc directly.
-- **Entrypoints** (`src/cli/`): `verify.ts` (per-service auth checks + namespace bootstrap +
-  staging post; behind `phase0-verify.yml`), `registry.ts` (`--command seed|export`); `ingest`,
-  `crawl`, `report` are stubs until their phases.
-- **Workflows:** `ci.yml` (lint + typecheck + test on push), `phase0-verify.yml`, and the four
-  thin shells `w0-registry` / `w1-ingest` / `w2-crawl` / `w3-report` (`workflow_dispatch` only —
-  add each cron in the phase that implements the entrypoint).
-- All six TurboPuffer namespaces exist; each contains an idempotent `_bootstrap` marker row
-  (no `url`/`record_type` attributes, so production queries never match it).
-
-### Source-specific constraints (from phase 0 research — see docs/sources-v1.md notes)
-
-- Every `sec.gov` request (feeds + EDGAR) must send a declared-contact User-Agent
-  (e.g. `Aggie Intel research@spokephone.com`) or it 403s.
-- FINRA feeds are `http://` only; FinCEN and the RingCentral/8x8 status pages have no feeds
-  (crawl targets); RingCentral/8x8 job boards are Workday POST APIs, seeded inactive.
-
 ## Development
 
 - Commands: `npm run check` (lint + typecheck + test — run before every commit),
@@ -130,3 +51,44 @@ Planned layout: `src/{clients,pipeline,report,registry,cli}`, `test/fixtures`,
   idempotent, so re-running any workflow is always safe. No custom retry logic.
 - Threshold changes (dedupe candidate similarity starts at 0.90; alert sentiment starts at
   `moderate`) must be logged in `docs/tuning-log.md` with date and reason.
+
+## Guidelines - MUST FOLLOW
+1. **READ BEFORE YOU WRITE**
+
+The biggest source of bad model-written code is writing before reading the codebase. Read the files you are about to touch; read, not skim. Copy the patterns that already exist, and check the imports to see what the project actually depends on, so you do not reach for axios where everything is fetch. When you cannot find a pattern, ask instead of guessing.
+
+2. **THINK BEFORE YOU CODE**
+
+Figure out what you are doing before you type. State your assumptions ("add authentication" is five different things, so name the one you picked) and name the tradeoffs. If something is genuinely confusing, stop and ask rather than filling the gap with plausible-looking code; that is exactly the code that passes a casual review and fails when it matters.
+
+3. **SIMPLICITY**
+
+Write the minimum code that solves the problem in front of you now, not the minimum that could solve every future version of it. Resist premature abstraction, skip error handling for errors that cannot occur, and hardcode values until there is a real reason to configure them. The test: if the only reason something is abstracted is "in case we need to," you have over-built it.
+
+4. **SURGICAL CHANGER**
+
+Your diff should be as small as the task allows. Do not touch what you were not asked to touch, match the existing style, and do not reformat; a formatter pass buries the three lines that matter inside three hundred that do not. The test is whether you can justify every changed line by the task. If a line is there because "while I was in there," revert it.
+
+5. **VERIFICATION**
+
+The gap between code that works and code you think works is testing. When fixing a bug, write the failing test first, watch it fail, then fix it; that is the only proof you fixed the cause and not the symptom. Test behavior that can actually break, not that a constructor sets a field. If something is hard to test, that is information about the design, not permission to skip it.
+
+6. **GOAL-DRIVEN EXECUTION**
+
+Every task needs a success criterion before code is written. "Add validation" becomes "reject a missing or malformed email, return 400 with a clear message, and test both cases." For anything multi-step, state the plan first so the user can catch a wrong approach before you spend an hour building it.
+
+7. **DEBUGGING**
+
+When something breaks, investigate; do not guess. Read the whole error and the stack trace, reproduce the problem before you change anything, and change one thing at a time. Do not paper over an unexpected null with a null check; find out why it is null, or the bug just moves somewhere quieter.
+
+*. **DEPENDENCIES**
+
+Every dependency is permanent code you do not control. Before adding one, ask whether the project or the standard library can already do it with crypto.random() over a uuid package. When you do add one, say why, so the choice is visible rather than smuggled into the manifest.
+
+9. **COMMUNICATION**
+
+Say what you did and why, not just a block of code. Flag concerns even when you did exactly what was asked, and be precise about uncertainty: "I am not sure this library supports streaming" tells the user what to verify; "I think this should work" does not.
+
+10. **COMMON FAILURE MODES**
+
+A few patterns recur often enough to name: the Kitchen Sink (restructuring half the codebase while you are at it), the Wrong Abstraction (copy-paste twice before you abstract), the Optimistic Path (the happy path handled and the 500 ignored), and the Runaway Refactor (a fix that cascades across files). Catch yourself in any of these and the right move is to stop, not to push through.

@@ -73,6 +73,21 @@ describe("firecrawl batch change tracking", () => {
     expect(results.pages[1]?.diffText).toBe("");
   });
 
+  it("does not follow next pagination while the job is still in progress", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    const inProgress = {
+      status: "scraping",
+      next: "https://api.firecrawl.dev/v2/batch/scrape/job-1?skip=1",
+      data: []
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(inProgress));
+    vi.stubGlobal("fetch", fetchMock);
+    const results = await getBatchResults("job-1");
+    expect(results.status).toBe("scraping");
+    expect(results.pages).toHaveLength(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("defaults an unknown changeStatus to same (discarded downstream)", async () => {
     vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
     const payload = {

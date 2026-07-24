@@ -139,11 +139,16 @@ const followNext = async (next: string | null, acc: BatchPageData[]): Promise<Ba
   return followNext(page.next ?? null, [...acc, ...(page.data ?? [])]);
 };
 
+/** An in-progress job keeps returning next cursors forever — only paginate once completed. */
 const getBatchResults = async (jobId: string): Promise<BatchResults> => {
   const first = await fetchBatchPage(`${FIRECRAWL_API_BASE}/batch/scrape/${jobId}`);
+  const status = first.status ?? "";
+  if (status !== BATCH_STATUS_COMPLETED) {
+    return { status, pages: [] };
+  }
   const rest = await followNext(first.next ?? null, []);
   const entries = [...(first.data ?? []), ...rest];
-  return { status: first.status ?? "", pages: entries.map(toPageResult) };
+  return { status, pages: entries.map(toPageResult) };
 };
 
 export {

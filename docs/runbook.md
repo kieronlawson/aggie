@@ -12,6 +12,17 @@ Actions → **w0-registry** → Run workflow. Pick the command and fill the rele
 
 Every W0 run posts what it did to `#intel-staging`.
 
+## Running the crawl (W2)
+
+Actions → **w2-crawl** → Run workflow (also runs on the Saturday cron). The run reads active
+crawl sources from the registry, starts one Firecrawl change-tracking batch, and polls it to
+completion in-run (15-minute deadline — a timeout fails the run with a ❌ post; re-running is
+safe). Unchanged pages and already-seen new URLs are discarded; new/changed pages go through P
+with classification on the diff plus page context. Every run posts a 🕸️ summary to
+`#intel-staging` (pages checked / changed / new / stored / merged, with ⚠️ lines for per-page
+failures). The first run is a baseline: every page is `new`. A credits guard fails the run
+before starting the batch when the Firecrawl balance is below one credit per page.
+
 ## Reading the failure footer
 
 Each digest ends with a **Footer** listing sources that failed that week (full plumbing lands in

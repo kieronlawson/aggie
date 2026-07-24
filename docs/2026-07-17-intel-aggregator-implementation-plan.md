@@ -8,6 +8,13 @@ the §5-described channel cutover, which moves to whichever phase completes last
 sources-v2/v3 research found the highest-value uncovered sources are all feedless (Smarsh,
 8x8/Aircall newsrooms, 10DLC carrier-policy trackers), and the alert branch's best outage
 sources (RingCentral/8x8 status pages) are themselves crawl targets.
+**Amendment (2026-07-24, Kieron):** job-board ingestion (§4 task 1) is deferred indefinitely —
+the Greenhouse/Lever/SmartRecruiters registry entries stay seeded but inactive-in-practice (no
+entrypoint fetches them). Order after phase 3 (W2 crawl): the competitor digest joins the weekly
+schedule immediately (the scheduled W3 run reports every vertical with registered sources, not
+just finance), then phase 4 (insurance/healthcare) proceeds. The alert branch (§4 task 2) stays
+in scope with its own quality gate, scheduled after phase 4. The channel cutover remains a [K]
+gate decision at the phase 3 review.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 

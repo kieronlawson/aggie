@@ -34,13 +34,20 @@ const alreadyDelivered = async (vertical: Vertical, reportDate: string): Promise
 
 const CARD_POINTER = "🧵 _Full digest in thread →_";
 
-const deliverToSlack = async (card: string, thread: string): Promise<void> => {
+/**
+ * Promotion map: a vertical's digest moves out of staging when its gate passes.
+ * Competitor promoted 2026-07-24 (Kieron); ops posts (📭/❌) always stay in staging.
+ */
+const channelFor = (vertical: Vertical): SlackChannel =>
+  vertical === Vertical.Competitor ? SlackChannel.IntelCompetitive : SlackChannel.IntelStaging;
+
+const deliverToSlack = async (channel: SlackChannel, card: string, thread: string): Promise<void> => {
   const cardChunks = chunkForSlack(toMrkdwn(card));
   const threadChunks = chunkForSlack(toMrkdwn(thread));
   const [first, ...cardOverflow] = cardChunks;
-  const threadTs = await postMessage(SlackChannel.IntelStaging, first ?? "");
+  const threadTs = await postMessage(channel, first ?? "");
   await sequentially([...cardOverflow, ...threadChunks], async (chunk) => {
-    await postThreadReply(SlackChannel.IntelStaging, threadTs, chunk);
+    await postThreadReply(channel, threadTs, chunk);
   });
 };
 
@@ -75,9 +82,10 @@ const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVe
     `📡 *Aggie · ${vertical} · week of ${reportDate}* — ` +
     `${String(generated.items)} items · ${String(generated.clusters)} stories`;
   const cardText = [header, card, CARD_POINTER].filter((part) => part.length > 0).join("\n\n");
-  await deliverToSlack(cardText, thread);
+  const channel = channelFor(vertical);
+  await deliverToSlack(channel, cardText, thread);
   await upsertReport(vertical, reportDate, digest);
-  console.log(`Digest for ${vertical} posted to #intel-staging (threaded) and upserted (${reportDate}).`);
+  console.log(`Digest for ${vertical} posted to ${channel} (threaded) and upserted (${reportDate}).`);
 };
 
 /** One vertical's failure must not block the rest — collect it for the single ❌ post. */

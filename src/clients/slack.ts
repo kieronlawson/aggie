@@ -3,7 +3,7 @@ import { requireEnv } from "#src/config.ts";
 enum SlackChannel {
   IntelStaging = "#intel-staging",
   IntelDigest = "#intel-digest",
-  CompetitiveIntel = "#competitive-intel"
+  IntelCompetitive = "#intel-competitive"
 }
 
 const SLACK_API_BASE = "https://slack.com/api";

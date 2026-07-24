@@ -15,6 +15,12 @@ schedule immediately (the scheduled W3 run reports every vertical with registere
 just finance), then phase 4 (insurance/healthcare) proceeds. The alert branch (§4 task 2) stays
 in scope with its own quality gate, scheduled after phase 4. The channel cutover remains a [K]
 gate decision at the phase 3 review.
+**Amendment (2026-07-24, Kieron, later same day):** `#competitive-intel` is renamed
+`#intel-competitive`, and ALL competitive output — weekly digest now, immediate alerts when the
+alert branch builds — goes there (supersedes the spec's digest-vs-alert channel split for the
+competitor vertical). Kieron reviewed the first competitor digest and signed off the competitor
+slice of the cutover; it is promoted out of staging via `channelFor` in `src/cli/report.ts`.
+Finance/insurance/healthcare digests stay in `#intel-staging` pending their gates.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 

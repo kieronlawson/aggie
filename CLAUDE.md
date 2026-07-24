@@ -37,7 +37,10 @@ a phase before the previous gate has passed.
   (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, `TURBOPUFFER_API_KEY`, `FIRECRAWL_API_KEY`,
   `SLACK_BOT_TOKEN`); a `.env.example` documents the set for local runs.
 - **All build-time output posts to `#intel-staging`** until the relevant phase gate promotes it
-  to `#intel-digest` / `#competitive-intel`.
+  to `#intel-digest` / `#intel-competitive` (renamed from `#competitive-intel` 2026-07-24). The
+  promotion mechanism is `channelFor` in `src/cli/report.ts` — one line per promoted vertical.
+  Competitor is promoted: all competitive output (digest, and alerts once built) goes to
+  `#intel-competitive`. Ops posts (📭/❌) always stay in staging.
 - Respect the spec's non-goals: no UI, no auth, no scraping of G2/Capterra/LinkedIn, no real-time
   pipeline, no services beyond Firecrawl, TurboPuffer, GitHub, Anthropic, and Voyage.
 

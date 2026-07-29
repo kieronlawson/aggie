@@ -53,17 +53,31 @@ type SearchNewsResult = {
   date?: string;
 };
 
-type SearchResponse = {
-  success: boolean;
-  data?: { news?: SearchNewsResult[] };
+type SearchWebResult = {
+  title?: string;
+  description?: string;
+  url?: string;
 };
 
-/** News-category search; costs 2 credits per 10 results, no scraping. */
-const searchNews = async (query: string, limit: number): Promise<SearchNewsResult[]> => {
+type SearchResponse = {
+  success: boolean;
+  data?: { news?: SearchNewsResult[]; web?: SearchWebResult[] };
+};
+
+type SearchResults = {
+  news: SearchNewsResult[];
+  web: SearchWebResult[];
+};
+
+/** Google-style time filter; only applies to web-category results, not news. */
+const SEARCH_TBS_PAST_WEEK = "qdr:w";
+
+/** News + past-week web search; costs 2 credits per 10 results, no scraping. */
+const searchRecent = async (query: string, limit: number): Promise<SearchResults> => {
   const response = await fetch(`${FIRECRAWL_API_BASE}/search`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ query, sources: ["news"], limit })
+    body: JSON.stringify({ query, sources: ["news", "web"], tbs: SEARCH_TBS_PAST_WEEK, limit })
   });
   if (!response.ok) {
     throw new Error(
@@ -71,7 +85,7 @@ const searchNews = async (query: string, limit: number): Promise<SearchNewsResul
     );
   }
   const payload = (await response.json()) as SearchResponse;
-  return payload.data?.news ?? [];
+  return { news: payload.data?.news ?? [], web: payload.data?.web ?? [] };
 };
 
 enum ChangeStatus {
@@ -189,7 +203,9 @@ export {
   getBatchResults,
   remainingCredits,
   scrapeRaw,
-  searchNews,
   type SearchNewsResult,
+  searchRecent,
+  type SearchResults,
+  type SearchWebResult,
   startChangeTrackingBatch
 };

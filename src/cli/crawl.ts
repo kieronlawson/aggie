@@ -8,7 +8,9 @@ import {
   type CrawlPageResult,
   getBatchResults,
   remainingCredits,
-  searchNews,
+  type SearchNewsResult,
+  searchRecent,
+  type SearchWebResult,
   startChangeTrackingBatch
 } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
@@ -219,9 +221,22 @@ const EMPTY_SEARCH_OUTCOME: SearchOutcome = {
 
 const isRawItem = (value: RawItem | SearchDrop): value is RawItem => typeof value !== "string";
 
+/** Web results carry no date; tbs=qdr:w already bounds them to the past week, so stamp them now. */
+const webAsDated = (web: SearchWebResult[], nowMs: number): SearchNewsResult[] =>
+  R.map(
+    (result: SearchWebResult) => ({
+      title: result.title ?? "",
+      url: result.url ?? "",
+      snippet: result.description ?? "",
+      date: new Date(nowMs).toISOString()
+    }),
+    web
+  );
+
 const searchSource = async (source: SourceRecord, nowMs: number): Promise<SearchOutcome> => {
   try {
-    const results = await searchNews(source.url, SEARCH_RESULT_LIMIT);
+    const { news, web } = await searchRecent(source.url, SEARCH_RESULT_LIMIT);
+    const results = [...news, ...webAsDated(web, nowMs)];
     const mapped = R.map((result) => searchRawItem({ source, result, nowMs }), results);
     const drops = R.countBy(String, R.reject(isRawItem, mapped));
     const fresh = R.uniqBy((item: RawItem) => item.url, R.filter(isRawItem, mapped));

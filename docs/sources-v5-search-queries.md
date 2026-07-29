@@ -18,10 +18,14 @@ Searches fill the gap between "sources we watch" and "stories published anywhere
 
 - `SourceKind.Search` registry rows; the `url` field carries the query. Managed via W0
   (`kind=search`) like any source.
-- Runs in the Saturday W2 job (`runSearchStage` in `src/cli/crawl.ts`): news-category search,
-  10 results per query, date-filtered to 14 days client-side (`tbs` doesn't apply to news
-  results), undated results dropped rather than stamped fresh, seen-URL filtered, then through
-  the normal P pipeline (classify → embed → dedupe → upsert).
+- Runs in the Saturday W2 job (`runSearchStage` in `src/cli/crawl.ts`): news + web categories,
+  10 results per query per category. News results are date-filtered to 14 days client-side
+  (`tbs` doesn't apply to news; undated results dropped rather than stamped fresh). Web results
+  use `tbs=qdr:w` (past week, API-side) and are stamped with the run date since they carry no
+  date — this catches law-firm/regulator posts that news indexing misses. Everything is
+  seen-URL filtered, then flows through the normal P pipeline (classify → embed → dedupe →
+  upsert). The first run showed why the recency machinery matters: 42 of 52 news results were
+  older than the window (news search ranks by relevance, not date).
 - Search-found stories dedupe against feed/crawl items via the existing embedding layer, so a
   story arriving from both a feed and a search merges normally.
 

@@ -9,10 +9,11 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**Current status: phase 3 (W2 crawl) built and deployed — gate acceptance needs a real tracked
-page change to appear correctly classified in a digest. Per the plan's 2026-07-24 amendment:
-job boards are deferred indefinitely, the competitor digest joins the weekly schedule now, and
-phase 4 (insurance/healthcare) is next; the alert branch follows phase 4.** The
+**Current status: phase 3 gate passed 2026-07-29 (crawl-sourced page changes appeared correctly
+classified in the 2026-07-26 digest). Phase 4 in progress: insurance/healthcare sources seeded
+2026-07-29; gate acceptance is three vertical-correct digests on a Sunday. The alert branch
+follows phase 4 — before it builds, the classify prompt must learn to distinguish
+scheduled-future maintenance from occurred outages (see the plan's 2026-07-29 amendment).** The
 source of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,

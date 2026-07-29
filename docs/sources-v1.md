@@ -51,6 +51,40 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 |---|---|---|---|
 | FinCEN press releases | crawl | — | https://www.fincen.gov/news/press-releases |
 
+## Vertical: insurance
+
+### Feeds
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| National Law Review — Insurance, Reinsurance & Surety | feed | — | https://natlawreview.com/practice-groups/insurance/feed |
+| JD Supra — Insurance | feed | — | https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=Insurance&premium=1 |
+| Insurance Journal | feed | — | https://www.insurancejournal.com/feed/ |
+
+### Crawl targets (Firecrawl change-tracking)
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| InsuranceNewsNet | crawl | — | https://insurancenewsnet.com/ |
+| NAIC newsroom | crawl | — | https://content.naic.org/newsroom |
+| NY DFS press releases | crawl | — | https://www.dfs.ny.gov/reports_and_publications/press_releases |
+
+## Vertical: healthcare
+
+### Feeds
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| HIPAA Journal | feed | — | https://www.hipaajournal.com/feed/ |
+| JD Supra — HIPAA | feed | — | https://www.jdsupra.com/topics/hipaa_rss/ |
+
+### Crawl targets (Firecrawl change-tracking)
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| HHS OCR newsroom | crawl | — | https://www.hhs.gov/ocr/newsroom/index.html |
+| Healthcare IT News | crawl | — | https://www.healthcareitnews.com/ |
+
 ## Vertical: competitor
 
 ### Feeds
@@ -110,4 +144,5 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 - Aircall publishes no blog RSS (their /feed URL serves an HTML app); coverage comes from their status feed, Lever job board, and pricing-page crawl.
 - Sources-v2 (2026-07-20): FTC press releases carry mostly non-telemarketing output — the relevance gate does the filtering. Banking Dive is high-volume general banking news; same reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md.
 - Sources-v3 keyword round (2026-07-20, TCPA/10DLC/DNC/TCR): Kelley Drye, Duane Morris, CommLaw Group, and DNC.com are commentary/vendor class — the evergreen split and relevance gate carry the filtering. The Campaign Registry feed is authoritative but sporadic (~months between posts); 10DLC carrier-policy trackers (Telgorithm, SIPNEX, MyTCRPlus, CTIA Principles page) are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md.
+- Phase 4 (2026-07-29): JD Supra's legacy feed endpoint (legal-news/feed.aspx) returns 503 everywhere, but the docsRSSfeed.aspx format the finance rows already use works for Insurance (50 items, current) — seeded with that URL. Insurance Journal is high-volume general trade press carried behind the relevance gate. HHS OIG's whatsnew.xml returned HTTP 000 from both the research sandbox and NZ local egress — retest from the Actions runner before seeding; OCR newsroom crawl covers HHS enforcement meanwhile. Deliberately skipped: Healthcare Dive/Fierce Healthcare (add one later if the healthcare digest runs thin), HIPAA Pulse (vendor skew), JD Supra Telehealth/Privacy/ConsumerProtection (noise/overlap with TCPAWorld), OCR breach portal (JSF form, not crawl-friendly), CA DOI/TX TDI (lower priority than NY DFS). See docs/sources-insurance-candidates.md and docs/sources-healthcare-candidates.md.
 

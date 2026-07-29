@@ -1,6 +1,6 @@
-# Sources — healthcare vertical feed candidates (phase 4 research, not seeded)
+# Sources — healthcare vertical feed candidates (phase 4 research)
 
-Research output for the healthcare vertical of the intel aggregator. **Nothing here is seeded.** This is a review list for Kieron: pick the `seed-now` rows, then add them to `src/registry/seed.ts` and re-export (never edit `docs/sources-v1.md` directly).
+Research output for the healthcare vertical of the intel aggregator. **Seeded 2026-07-29** (phase 4): HIPAA Journal and JD Supra HIPAA feeds, plus crawl targets HHS OCR newsroom and Healthcare IT News. HHS OIG's feed also failed (HTTP 000) from NZ local egress — still pending an Actions-egress test before it could be seeded. See `HEALTHCARE_SOURCES` in `src/registry/seed.ts` and the phase 4 entry in `SEED_NOTES` for what was skipped and why.
 
 The healthcare digest should surface **regulatory news that touches communications compliance in healthcare**: HIPAA enforcement around patient communications (HHS OCR), texting/SMS patient outreach, TCPA actions against providers/telehealth, call-recording and consent in patient contact centers, telehealth communications compliance, robocall enforcement in healthcare marketing, and 42 CFR Part 2 where it touches communications. General healthcare news (payer M&A, drug pricing, ACA, clinical trials, reimbursement) is **noise** — the strongest picks below are dense in the compliance/communications angle; the broad trade-press feeds are carried only with a hard relevance gate.
 

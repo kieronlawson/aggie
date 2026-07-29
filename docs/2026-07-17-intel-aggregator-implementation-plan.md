@@ -21,6 +21,18 @@ alert branch builds — goes there (supersedes the spec's digest-vs-alert channe
 competitor vertical). Kieron reviewed the first competitor digest and signed off the competitor
 slice of the cutover; it is promoted out of staging via `channelFor` in `src/cli/report.ts`.
 Finance/insurance/healthcare digests stay in `#intel-staging` pending their gates.
+**Amendment (2026-07-29, Kieron):** phase 3 gate PASSED. The 2026-07-26 competitor digest carried
+four crawl-sourced page changes correctly classified (RingCentral pricing cut, 8x8 pricing-page
+widget removal, Twilio Flex Agent Copilot pricing, Twilio/Aircall status maintenance) with a
+consistent quiet-sources footer; Kieron reviewed and signed off. The §5 gate's full channel
+cutover is superseded by the 2026-07-24 amendment: competitor is already promoted, and
+finance/insurance/healthcare stay in `#intel-staging` pending the phase 4 gate. Known quality
+issue carried forward to the alert branch: a status-page item scheduled for the future (Twilio
+Orange-France maintenance, Aug 17–18) was summarized in past tense as an occurred outage — the
+classify prompt must distinguish scheduled-future maintenance from occurred outages before
+alerts build on the `outage` classification. Phase 4's "add their cron entries to
+`w3-report.yml`" is also superseded — the scheduled W3 run already reports every vertical with
+registered sources.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 

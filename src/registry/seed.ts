@@ -10,6 +10,7 @@ import { type CompetitorRecord, Relationship, SourceKind, type SourceRecord, Ver
 
 const ADDED_AT = "2026-07-17T00:00:00Z";
 const ADDED_AT_V2 = "2026-07-20T00:00:00Z";
+const ADDED_AT_PHASE4 = "2026-07-29T00:00:00Z";
 
 const SEED_COMPETITORS: CompetitorRecord[] = [
   { name: "RingCentral", relationship: Relationship.Displace, aliases: ["RNG", "RingCentral MVP", "RingEX"], active: true },
@@ -130,13 +131,53 @@ const CRAWL_TARGETS: SourceRecord[] = [
   }
 ];
 
+const verticalSource =
+  (vertical: Vertical) =>
+    (kind: SourceKind, name: string, url: string): SourceRecord => ({
+      kind,
+      url,
+      name,
+      vertical,
+      competitor: "",
+      active: true,
+      added_at: ADDED_AT_PHASE4
+    });
+
+const insuranceSource = verticalSource(Vertical.Insurance);
+const healthcareSource = verticalSource(Vertical.Healthcare);
+
+/**
+ * Phase 4 (2026-07-29): seed-now picks from docs/sources-insurance-candidates.md and
+ * docs/sources-healthcare-candidates.md, re-verified from local egress on seed day.
+ */
+const INSURANCE_SOURCES: SourceRecord[] = [
+  insuranceSource(SourceKind.Feed, "National Law Review — Insurance, Reinsurance & Surety",
+    "https://natlawreview.com/practice-groups/insurance/feed"),
+  insuranceSource(SourceKind.Feed, "JD Supra — Insurance",
+    "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=Insurance&premium=1"),
+  insuranceSource(SourceKind.Feed, "Insurance Journal", "https://www.insurancejournal.com/feed/"),
+  insuranceSource(SourceKind.Crawl, "InsuranceNewsNet", "https://insurancenewsnet.com/"),
+  insuranceSource(SourceKind.Crawl, "NAIC newsroom", "https://content.naic.org/newsroom"),
+  insuranceSource(SourceKind.Crawl, "NY DFS press releases",
+    "https://www.dfs.ny.gov/reports_and_publications/press_releases")
+];
+
+const HEALTHCARE_SOURCES: SourceRecord[] = [
+  healthcareSource(SourceKind.Feed, "HIPAA Journal", "https://www.hipaajournal.com/feed/"),
+  healthcareSource(SourceKind.Feed, "JD Supra — HIPAA", "https://www.jdsupra.com/topics/hipaa_rss/"),
+  healthcareSource(SourceKind.Crawl, "HHS OCR newsroom", "https://www.hhs.gov/ocr/newsroom/index.html"),
+  healthcareSource(SourceKind.Crawl, "Healthcare IT News", "https://www.healthcareitnews.com/")
+];
+
 const SEED_SOURCES: SourceRecord[] = [
   ...REGULATOR_FEEDS,
   ...TRADE_PRESS_FEEDS,
   ...COMMENTARY_FEEDS,
   ...COMPETITOR_FEEDS,
   ...JOB_BOARDS,
-  ...CRAWL_TARGETS
+  ...CRAWL_TARGETS,
+  ...INSURANCE_SOURCES,
+  ...HEALTHCARE_SOURCES
 ];
 
 const SEED_NOTES: string[] = [
@@ -163,7 +204,17 @@ const SEED_NOTES: string[] = [
     "Group, and DNC.com are commentary/vendor class — the evergreen split and relevance gate carry " +
     "the filtering. The Campaign Registry feed is authoritative but sporadic (~months between " +
     "posts); 10DLC carrier-policy trackers (Telgorithm, SIPNEX, MyTCRPlus, CTIA Principles page) " +
-    "are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md."
+    "are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md.",
+  "Phase 4 (2026-07-29): JD Supra's legacy feed endpoint (legal-news/feed.aspx) returns 503 " +
+    "everywhere, but the docsRSSfeed.aspx format the finance rows already use works for Insurance " +
+    "(50 items, current) — seeded with that URL. Insurance Journal is high-volume general trade " +
+    "press carried behind the relevance gate. HHS OIG's whatsnew.xml returned HTTP 000 from both " +
+    "the research sandbox and NZ local egress — retest from the Actions runner before seeding; OCR " +
+    "newsroom crawl covers HHS enforcement meanwhile. Deliberately skipped: Healthcare Dive/Fierce " +
+    "Healthcare (add one later if the healthcare digest runs thin), HIPAA Pulse (vendor skew), " +
+    "JD Supra Telehealth/Privacy/ConsumerProtection (noise/overlap with TCPAWorld), OCR breach " +
+    "portal (JSF form, not crawl-friendly), CA DOI/TX TDI (lower priority than NY DFS). See " +
+    "docs/sources-insurance-candidates.md and docs/sources-healthcare-candidates.md."
 ];
 
 export { SEED_COMPETITORS, SEED_NOTES, SEED_SOURCES };

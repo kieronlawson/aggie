@@ -2,7 +2,7 @@ import * as R from "ramda";
 
 import { HAIKU_MODEL, OPUS_MODEL, pingModel } from "#src/clients/anthropic.ts";
 import { remainingCredits } from "#src/clients/firecrawl.ts";
-import { authTest, postMessage, readMessages, SlackChannel } from "#src/clients/slack.ts";
+import { authTest, channelId, postMessage, readMessages, SlackChannel } from "#src/clients/slack.ts";
 import {
   ALL_NAMESPACES,
   listNamespaces,
@@ -81,7 +81,8 @@ const bootstrapNamespaces = async (): Promise<string> => {
 };
 
 const checkSlackRead = async (): Promise<string> => {
-  const messages = await readMessages(SlackChannel.IntelStaging, 1);
+  const id = await channelId(SlackChannel.IntelStaging);
+  const messages = await readMessages(id, 1);
   const latest = messages[0];
   if (latest === undefined) {
     throw new Error(`No messages readable in ${SlackChannel.IntelStaging}`);

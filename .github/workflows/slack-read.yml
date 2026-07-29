@@ -1,0 +1,38 @@
+name: slack-read
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Channel to read (empty = #intel-staging)"
+        required: false
+        type: choice
+        default: "#intel-staging"
+        options:
+          - "#intel-staging"
+          - "#intel-digest"
+          - "#intel-competitive"
+      limit:
+        description: "Number of recent messages to read (empty = 20)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run read -- --channel "$INPUT_CHANNEL" --limit "$INPUT_LIMIT"
+        env:
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

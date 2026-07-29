@@ -78,6 +78,8 @@ type SlackMessage = {
   ts: string;
   text?: string;
   thread_ts?: string;
+  reply_count?: number;
+  blocks?: SlackBlock[];
 };
 
 type SlackReadResponse = SlackResponse & {
@@ -120,17 +122,25 @@ const channelId = async (channel: SlackChannel, cursor?: string): Promise<string
   return channelId(channel, nextCursor);
 };
 
-const readMessages = async (channel: SlackChannel, limit: number): Promise<SlackMessage[]> => {
-  const id = await channelId(channel);
+const readMessages = async (id: string, limit: number): Promise<SlackMessage[]> => {
   const payload = await slackGet("conversations.history", { channel: id, limit: String(limit) });
+  return payload.messages ?? [];
+};
+
+const REPLY_PAGE_LIMIT = "100";
+
+const readReplies = async (id: string, threadTs: string): Promise<SlackMessage[]> => {
+  const payload = await slackGet("conversations.replies", { channel: id, ts: threadTs, limit: REPLY_PAGE_LIMIT });
   return payload.messages ?? [];
 };
 
 export {
   authTest,
+  channelId,
   postMessage,
   postThreadReply,
   readMessages,
+  readReplies,
   type SlackBlock,
   SlackChannel,
   type SlackMessage

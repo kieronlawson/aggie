@@ -147,6 +147,9 @@ const renameSourceRows = async (source: SourceRecord): Promise<number> => {
     topK: BACKFILL_QUERY_LIMIT,
     includeAttributes: ["url"]
   });
+  if (rows.length === 0) {
+    return 0;
+  }
   await patchRows(
     itemsNamespaceFor(source.vertical),
     R.map((row) => ({ id: row.id, source: source.name }), rows)

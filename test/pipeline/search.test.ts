@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { searchPublishedAt, searchRawItem } from "#src/pipeline/search.ts";
+import { SearchDrop, searchPublishedAt, searchRawItem } from "#src/pipeline/search.ts";
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 const NOW_MS = Date.parse("2026-07-29T12:00:00.000Z");
@@ -43,25 +43,28 @@ describe("searchRawItem", () => {
 
   it("maps a dated result to a RawItem carrying the source name and vertical", () => {
     const item = searchRawItem({ source, result, nowMs: NOW_MS });
-    expect(item?.url).toBe("https://example.com/doi-fines-agency");
-    expect(item?.title).toBe("State DOI fines agency over robocalls");
-    expect(item?.content).toContain("prerecorded calls");
-    expect(item?.published_at).toBe("2026-07-27T12:00:00.000Z");
-    expect(item?.source).toBe("Search: insurance TCPA/telemarketing");
-    expect(item?.vertical).toBe(Vertical.Insurance);
+    expect(item).toMatchObject({
+      url: "https://example.com/doi-fines-agency",
+      title: "State DOI fines agency over robocalls",
+      published_at: "2026-07-27T12:00:00.000Z",
+      source: "Search: insurance TCPA/telemarketing",
+      vertical: Vertical.Insurance
+    });
+    expect((item as { content: string }).content).toContain("prerecorded calls");
   });
 
   it("drops undated results instead of stamping them fresh", () => {
     const { date: _date, ...undated } = result;
-    expect(searchRawItem({ source, result: undated, nowMs: NOW_MS })).toBeNull();
+    expect(searchRawItem({ source, result: undated, nowMs: NOW_MS })).toBe(SearchDrop.Undated);
   });
 
   it("drops results older than the ingest window", () => {
-    expect(searchRawItem({ source, result: { ...result, date: "2026-07-01T00:00:00Z" }, nowMs: NOW_MS })).toBeNull();
+    const stale = { ...result, date: "2026-07-01T00:00:00Z" };
+    expect(searchRawItem({ source, result: stale, nowMs: NOW_MS })).toBe(SearchDrop.Stale);
   });
 
   it("drops results without a usable URL", () => {
     const { url: _url, ...unlinked } = result;
-    expect(searchRawItem({ source, result: unlinked, nowMs: NOW_MS })).toBeNull();
+    expect(searchRawItem({ source, result: unlinked, nowMs: NOW_MS })).toBe(SearchDrop.NoUrl);
   });
 });

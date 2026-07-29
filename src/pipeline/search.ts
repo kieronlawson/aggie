@@ -41,18 +41,24 @@ type SearchItemOpts = {
   nowMs: number;
 };
 
-/** Maps a search result to a RawItem for P; null = drop (no URL, undated, or stale). */
-const searchRawItem = ({ source, result, nowMs }: SearchItemOpts): RawItem | null => {
+enum SearchDrop {
+  NoUrl = "no-url",
+  Undated = "undated",
+  Stale = "stale"
+}
+
+/** Maps a search result to a RawItem for P, or the reason it was dropped. */
+const searchRawItem = ({ source, result, nowMs }: SearchItemOpts): RawItem | SearchDrop => {
   const url = result.url ?? "";
   if (!url.startsWith("http")) {
-    return null;
+    return SearchDrop.NoUrl;
   }
   const publishedAt = searchPublishedAt(result.date ?? "", nowMs);
   if (publishedAt.length === 0) {
-    return null;
+    return SearchDrop.Undated;
   }
   if (Date.parse(publishedAt) < nowMs - SEARCH_MAX_AGE_DAYS * DAY_MS) {
-    return null;
+    return SearchDrop.Stale;
   }
   const title = (result.title ?? "").trim();
   const snippet = (result.snippet ?? "").trim();
@@ -68,4 +74,4 @@ const searchRawItem = ({ source, result, nowMs }: SearchItemOpts): RawItem | nul
   };
 };
 
-export { SEARCH_MAX_AGE_DAYS, type SearchItemOpts, searchPublishedAt, searchRawItem };
+export { SEARCH_MAX_AGE_DAYS, SearchDrop, type SearchItemOpts, searchPublishedAt, searchRawItem };

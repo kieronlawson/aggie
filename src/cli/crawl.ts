@@ -16,7 +16,7 @@ import { queryRows } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { crawlRawItem } from "#src/pipeline/crawl.ts";
 import { itemsNamespaceFor, ProcessOutcome, processRawItem } from "#src/pipeline/process.ts";
-import { searchRawItem } from "#src/pipeline/search.ts";
+import { SearchDrop, searchRawItem } from "#src/pipeline/search.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
 import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
@@ -195,35 +195,53 @@ const SEARCH_RESULT_LIMIT = 10;
 
 type SearchOutcome = {
   fetched: number;
+  noUrl: number;
+  undated: number;
+  stale: number;
+  alreadySeen: number;
   unseen: number;
   stored: number;
   merged: number;
   failure: string;
 };
 
-const isRawItem = (value: RawItem | null): value is RawItem => value !== null;
+const EMPTY_SEARCH_OUTCOME: SearchOutcome = {
+  fetched: 0,
+  noUrl: 0,
+  undated: 0,
+  stale: 0,
+  alreadySeen: 0,
+  unseen: 0,
+  stored: 0,
+  merged: 0,
+  failure: ""
+};
+
+const isRawItem = (value: RawItem | SearchDrop): value is RawItem => typeof value !== "string";
 
 const searchSource = async (source: SourceRecord, nowMs: number): Promise<SearchOutcome> => {
   try {
     const results = await searchNews(source.url, SEARCH_RESULT_LIMIT);
-    const mapped = R.filter(
-      isRawItem,
-      R.map((result) => searchRawItem({ source, result, nowMs }), results)
-    );
-    const fresh = R.uniqBy((item: RawItem) => item.url, mapped);
+    const mapped = R.map((result) => searchRawItem({ source, result, nowMs }), results);
+    const drops = R.countBy(String, R.reject(isRawItem, mapped));
+    const fresh = R.uniqBy((item: RawItem) => item.url, R.filter(isRawItem, mapped));
     const seen = await seenUrlsForVertical(source.vertical, R.map((item: RawItem) => item.url, fresh));
     const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
     const outcomes = await sequentially(unseen, processRawItem);
     return {
+      ...EMPTY_SEARCH_OUTCOME,
       fetched: results.length,
+      noUrl: drops[SearchDrop.NoUrl] ?? 0,
+      undated: drops[SearchDrop.Undated] ?? 0,
+      stale: drops[SearchDrop.Stale] ?? 0,
+      alreadySeen: fresh.length - unseen.length,
       unseen: unseen.length,
       stored: R.count((outcome) => outcome === ProcessOutcome.Stored, outcomes),
-      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes),
-      failure: ""
+      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes)
     };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return { fetched: 0, unseen: 0, stored: 0, merged: 0, failure: `${source.name}: ${detail}` };
+    return { ...EMPTY_SEARCH_OUTCOME, failure: `${source.name}: ${detail}` };
   }
 };
 
@@ -238,8 +256,10 @@ const runSearchStage = async (): Promise<string> => {
     R.sum(R.map((outcome: SearchOutcome) => outcome[key], outcomes));
   const failures = R.reject(R.isEmpty, R.map((outcome: SearchOutcome) => outcome.failure, outcomes));
   const headline =
-    `🔎 Aggie search: ${String(sources.length)} queries — ${String(total("fetched"))} results, ` +
-    `${String(total("unseen"))} fresh/unseen; stored ${String(total("stored"))}, merged ${String(total("merged"))}.`;
+    `🔎 Aggie search: ${String(sources.length)} queries — ${String(total("fetched"))} results ` +
+    `(${String(total("noUrl"))} no-url, ${String(total("undated"))} undated, ${String(total("stale"))} stale, ` +
+    `${String(total("alreadySeen"))} already seen), ${String(total("unseen"))} fresh/unseen; ` +
+    `stored ${String(total("stored"))}, merged ${String(total("merged"))}.`;
   return [headline, ...R.map((failure: string) => `⚠️ ${failure}`, failures)].join("\n");
 };
 

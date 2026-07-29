@@ -40,7 +40,12 @@ const SYSTEM_PROMPT =
   "their SEC filings.\n" +
   "Set relevant=false for everything else — e.g. general privacy/data-broker/breach laws, AI or " +
   "crypto regulation, ESG, employment law, tax, or securities-market news with no communications " +
-  "angle. When genuinely unsure, prefer relevant=true.\n\n" +
+  "angle.\n" +
+  "Spoke sells into the North American market. Set relevant=false when an item's impact is " +
+  "confined to markets outside North America — EU/UK/APAC-only regulation, enforcement, or court " +
+  "decisions, and incidents or carrier maintenance affecting only non-US/Canada countries — even " +
+  "when it otherwise matches (a) or (b). Items with global reach or direct US/Canada impact stay " +
+  "relevant. When genuinely unsure, prefer relevant=true.\n\n" +
   "Set content_kind=news when the item reports a dated event — an enforcement action, rule " +
   "proposal or adoption, court decision, filing, announcement, incident, or personnel change. " +
   "Set content_kind=evergreen for undated guidance, how-tos, best-practice explainers, webinars, " +

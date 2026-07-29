@@ -22,3 +22,9 @@ Every change to a tuning threshold, with date and reason. Current values:
 - 2026-07-20 — Added `content_kind` news/evergreen to the classifier; evergreen items excluded
   from digest stories, surfaced once in "Worth a read". Reason: evergreen vendor content (Global
   Relay) recurring as pseudo-news in continuing stories.
+
+- 2026-07-29 — Added a North American market scope to the relevance gate: items whose impact is
+  confined to non-NA markets are relevant=false even when they otherwise match (Kieron, after
+  the 2026-07-26 competitor digest led sales talking points with a France-only Twilio carrier
+  maintenance and an insurance item cited the Italian Council of State). Global-reach and
+  US/Canada-impact items stay relevant. Stored items re-judged via the relevance backfill.

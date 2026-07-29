@@ -100,10 +100,12 @@ const slackGet = async (method: string, params: Record<string, string>): Promise
 };
 
 const CHANNEL_PAGE_LIMIT = "200";
+const CHANNEL_TYPES = "public_channel,private_channel";
 
 const channelId = async (channel: SlackChannel, cursor?: string): Promise<string> => {
   const payload = await slackGet("conversations.list", {
     limit: CHANNEL_PAGE_LIMIT,
+    types: CHANNEL_TYPES,
     ...(cursor === undefined ? {} : { cursor })
   });
   const bareName = channel.slice(1);

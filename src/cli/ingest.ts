@@ -95,6 +95,7 @@ const summarize = (results: SourceResult[]): string => {
 
 const BACKFILL_QUERY_LIMIT = 1200;
 const RELEVANCE_BACKFILL_MODE = "relevance-backfill";
+const SOURCE_NAME_BACKFILL_MODE = "source-name-backfill";
 
 const str = (row: TpufResultRow, key: string): string => {
   const value = row[key];
@@ -139,6 +140,32 @@ const relevanceBackfill = async (): Promise<void> => {
   await postMessage(SlackChannel.IntelStaging, summary);
 };
 
+const renameSourceRows = async (source: SourceRecord): Promise<number> => {
+  const rows = await queryRows({
+    namespace: itemsNamespaceFor(source.vertical),
+    filters: ["source", "Eq", source.url],
+    topK: BACKFILL_QUERY_LIMIT,
+    includeAttributes: ["url"]
+  });
+  await patchRows(
+    itemsNamespaceFor(source.vertical),
+    R.map((row) => ({ id: row.id, source: source.name }), rows)
+  );
+  return rows.length;
+};
+
+/** One-off: feed items stored before 2026-07-29 carry the feed URL in `source`; rename to the registry name. */
+const sourceNameBackfill = async (): Promise<void> => {
+  const sources = await loadActiveSources(SourceKind.Feed);
+  const counts = await sequentially(sources, renameSourceRows);
+  const patched = R.sum(counts);
+  const summary = `🧹 Aggie source-name backfill complete — ${String(patched)} item rows renamed across ${String(
+    R.count((count: number) => count > 0, counts)
+  )} sources.`;
+  console.log(summary);
+  await postMessage(SlackChannel.IntelStaging, summary);
+};
+
 const runIngest = async (): Promise<void> => {
   const sources = await loadActiveSources(SourceKind.Feed);
   const competitors = await loadCompetitors();
@@ -151,10 +178,15 @@ const runIngest = async (): Promise<void> => {
   await postMessage(SlackChannel.IntelStaging, summary);
 };
 
+const MODE_HANDLERS: Record<string, () => Promise<void>> = {
+  [RELEVANCE_BACKFILL_MODE]: relevanceBackfill,
+  [SOURCE_NAME_BACKFILL_MODE]: sourceNameBackfill
+};
+
 const main = async (): Promise<void> => {
   const { values } = parseArgs({ options: { mode: { type: "string" } } });
   const mode = values.mode ?? "";
-  await (mode === RELEVANCE_BACKFILL_MODE ? relevanceBackfill() : runIngest());
+  await (MODE_HANDLERS[mode] ?? runIngest)();
 };
 
 await main().catch(async (error: unknown) => {

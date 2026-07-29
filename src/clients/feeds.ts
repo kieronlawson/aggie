@@ -109,7 +109,7 @@ const mapEntryToRawItem = (
   title: asString(entry.title).length > 0 ? asString(entry.title) : "(untitled)",
   content: entryContent(entry),
   published_at: publishedIso(entry, fallbackIso),
-  source: source.url,
+  source: source.name,
   vertical: source.vertical,
   competitor: source.competitor,
   relationship

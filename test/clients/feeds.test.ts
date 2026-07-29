@@ -30,6 +30,7 @@ describe("parseFeedXml + mapEntryToRawItem", () => {
     expect(items[0]?.published_at).toBe("2026-07-15T14:00:00.000Z");
     expect(items[0]?.vertical).toBe(Vertical.Finance);
     expect(items[0]?.relationship).toBe(Relationship.Regulatory);
+    expect(items[0]?.source).toBe("SEC press releases");
   });
 
   it("uses the title as content and the fallback date when the entry has neither", async () => {

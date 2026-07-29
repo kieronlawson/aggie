@@ -69,4 +69,67 @@ const authTest = async (): Promise<string> => {
   return `team ${payload.team ?? "?"}, bot ${payload.user ?? "?"}`;
 };
 
-export { authTest, postMessage, postThreadReply, type SlackBlock, SlackChannel };
+type SlackChannelInfo = {
+  id: string;
+  name: string;
+};
+
+type SlackMessage = {
+  ts: string;
+  text?: string;
+  thread_ts?: string;
+};
+
+type SlackReadResponse = SlackResponse & {
+  channels?: SlackChannelInfo[];
+  messages?: SlackMessage[];
+  response_metadata?: { next_cursor?: string };
+};
+
+/** Read methods take query params, not JSON bodies. */
+const slackGet = async (method: string, params: Record<string, string>): Promise<SlackReadResponse> => {
+  const query = new URLSearchParams(params).toString();
+  const response = await fetch(`${SLACK_API_BASE}/${method}?${query}`, {
+    headers: { Authorization: `Bearer ${requireEnv("SLACK_BOT_TOKEN")}` }
+  });
+  const payload = (await response.json()) as SlackReadResponse;
+  if (!payload.ok) {
+    throw new Error(`Slack ${method} failed: ${payload.error ?? `HTTP ${String(response.status)}`}`);
+  }
+  return payload;
+};
+
+const CHANNEL_PAGE_LIMIT = "200";
+
+const channelId = async (channel: SlackChannel, cursor?: string): Promise<string> => {
+  const payload = await slackGet("conversations.list", {
+    limit: CHANNEL_PAGE_LIMIT,
+    ...(cursor === undefined ? {} : { cursor })
+  });
+  const bareName = channel.slice(1);
+  const match = (payload.channels ?? []).find((info) => info.name === bareName);
+  if (match !== undefined) {
+    return match.id;
+  }
+  const nextCursor = payload.response_metadata?.next_cursor;
+  if (nextCursor === undefined || nextCursor.length === 0) {
+    throw new Error(`Slack channel ${channel} not found via conversations.list`);
+  }
+  return channelId(channel, nextCursor);
+};
+
+const readMessages = async (channel: SlackChannel, limit: number): Promise<SlackMessage[]> => {
+  const id = await channelId(channel);
+  const payload = await slackGet("conversations.history", { channel: id, limit: String(limit) });
+  return payload.messages ?? [];
+};
+
+export {
+  authTest,
+  postMessage,
+  postThreadReply,
+  readMessages,
+  type SlackBlock,
+  SlackChannel,
+  type SlackMessage
+};

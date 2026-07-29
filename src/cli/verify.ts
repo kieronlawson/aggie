@@ -2,7 +2,7 @@ import * as R from "ramda";
 
 import { HAIKU_MODEL, OPUS_MODEL, pingModel } from "#src/clients/anthropic.ts";
 import { remainingCredits } from "#src/clients/firecrawl.ts";
-import { authTest, postMessage, SlackChannel } from "#src/clients/slack.ts";
+import { authTest, postMessage, readMessages, SlackChannel } from "#src/clients/slack.ts";
 import {
   ALL_NAMESPACES,
   listNamespaces,
@@ -80,6 +80,15 @@ const bootstrapNamespaces = async (): Promise<string> => {
   return `${String(ALL_NAMESPACES.length)} namespaces present`;
 };
 
+const checkSlackRead = async (): Promise<string> => {
+  const messages = await readMessages(SlackChannel.IntelStaging, 1);
+  const latest = messages[0];
+  if (latest === undefined) {
+    throw new Error(`No messages readable in ${SlackChannel.IntelStaging}`);
+  }
+  return `read ${SlackChannel.IntelStaging}, latest message ts ${latest.ts}`;
+};
+
 const formatResult = (result: CheckResult): string => {
   const mark = result.ok ? "✅" : "❌";
   return `${mark} ${result.name}: ${result.detail}`;
@@ -92,7 +101,8 @@ const runChecks = async (): Promise<CheckResult[]> =>
     check("voyage", checkVoyage),
     check("turbopuffer", bootstrapNamespaces),
     check("firecrawl", async (): Promise<string> => `${String(await remainingCredits())} credits remaining`),
-    check("slack", authTest)
+    check("slack", authTest),
+    check("slack read", checkSlackRead)
   ]);
 
 const main = async (): Promise<void> => {

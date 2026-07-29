@@ -69,6 +69,14 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 | NAIC newsroom | crawl | — | https://content.naic.org/newsroom |
 | NY DFS press releases | crawl | — | https://www.dfs.ny.gov/reports_and_publications/press_releases |
 
+### Search queries (Firecrawl news search)
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| Search: insurance TCPA/telemarketing | search | — | insurance TCPA telemarketing enforcement lawsuit |
+| Search: insurance call recording | search | — | insurance call recording consent regulation |
+| Search: NAIC market conduct | search | — | NAIC market conduct insurance regulation enforcement |
+
 ## Vertical: healthcare
 
 ### Feeds
@@ -84,6 +92,14 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 |---|---|---|---|
 | HHS OCR newsroom | crawl | — | https://www.hhs.gov/ocr/newsroom/index.html |
 | Healthcare IT News | crawl | — | https://www.healthcareitnews.com/ |
+
+### Search queries (Firecrawl news search)
+
+| Source | Kind | Competitor | URL |
+|---|---|---|---|
+| Search: HIPAA patient communications | search | — | HIPAA enforcement patient communications texting |
+| Search: telehealth TCPA | search | — | telehealth healthcare TCPA robocall enforcement |
+| Search: healthcare call center compliance | search | — | hospital healthcare call center HIPAA compliance violation |
 
 ## Vertical: competitor
 
@@ -145,4 +161,5 @@ edit the seed data in `src/registry/seed.ts`, not this file.
 - Sources-v2 (2026-07-20): FTC press releases carry mostly non-telemarketing output — the relevance gate does the filtering. Banking Dive is high-volume general banking news; same reliance on the gate. TCPAWorld is law-firm commentary but functions as the fastest robocall/TCPA/DNC news wire. FCC feeds reviewed and skipped (nothing materially useful); ThinkAdvisor/InvestmentNews feeds are dead shells. See docs/sources-v2-candidates.md.
 - Sources-v3 keyword round (2026-07-20, TCPA/10DLC/DNC/TCR): Kelley Drye, Duane Morris, CommLaw Group, and DNC.com are commentary/vendor class — the evergreen split and relevance gate carry the filtering. The Campaign Registry feed is authoritative but sporadic (~months between posts); 10DLC carrier-policy trackers (Telgorithm, SIPNEX, MyTCRPlus, CTIA Principles page) are feedless and queued as W2 crawl candidates. See docs/sources-v3-keyword-candidates.md.
 - Phase 4 (2026-07-29): JD Supra's legacy feed endpoint (legal-news/feed.aspx) returns 503 everywhere, but the docsRSSfeed.aspx format the finance rows already use works for Insurance (50 items, current) — seeded with that URL. Insurance Journal is high-volume general trade press carried behind the relevance gate. HHS OIG's whatsnew.xml returned HTTP 000 from both the research sandbox and NZ local egress — retest from the Actions runner before seeding; OCR newsroom crawl covers HHS enforcement meanwhile. Deliberately skipped: Healthcare Dive/Fierce Healthcare (add one later if the healthcare digest runs thin), HIPAA Pulse (vendor skew), JD Supra Telehealth/Privacy/ConsumerProtection (noise/overlap with TCPAWorld), OCR breach portal (JSF form, not crawl-friendly), CA DOI/TX TDI (lower priority than NY DFS). See docs/sources-insurance-candidates.md and docs/sources-healthcare-candidates.md.
+- Sources-v5 (2026-07-29): six Firecrawl news-search queries added as kind=search rows (url field holds the query) after the first insurance/healthcare cycle showed feeds alone under-cover those verticals. Weekly in W2, 2 credits per query, classify on title+snippet. See docs/sources-v5-search-queries.md.
 

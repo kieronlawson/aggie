@@ -24,11 +24,12 @@ const sectionFor = (title: string, sources: SourceRecord[]): string[] => {
   ];
 };
 
-const KIND_ORDER: SourceKind[] = [SourceKind.Feed, SourceKind.JobBoard, SourceKind.Crawl];
+const KIND_ORDER: SourceKind[] = [SourceKind.Feed, SourceKind.JobBoard, SourceKind.Crawl, SourceKind.Search];
 const KIND_TITLES: Record<SourceKind, string> = {
   [SourceKind.Feed]: "Feeds",
   [SourceKind.JobBoard]: "Job boards",
-  [SourceKind.Crawl]: "Crawl targets (Firecrawl change-tracking)"
+  [SourceKind.Crawl]: "Crawl targets (Firecrawl change-tracking)",
+  [SourceKind.Search]: "Search queries (Firecrawl news search)"
 };
 
 const verticalSections = (vertical: Vertical, sources: SourceRecord[]): string[] => {

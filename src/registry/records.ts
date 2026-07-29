@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import * as R from "ramda";
 
 import { type TpufRow } from "#src/clients/turbopuffer.ts";
-import { type CompetitorRecord, type SourceRecord, Vertical } from "#src/registry/types.ts";
+import { type CompetitorRecord, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 /** Must match the embedding dimension used across all namespaces (voyage-4 default). */
 const REGISTRY_VECTOR_DIMS = 1024;
@@ -81,10 +81,14 @@ const validateRegistry = (competitors: CompetitorRecord[], sources: SourceRecord
     R.map((source: SourceRecord) => `Source ${source.url} references unknown competitor: ${source.competitor}`)
   )(sources);
   const badUrls = R.pipe(
-    R.reject((source: SourceRecord) => isValidUrl(source.url)),
+    R.reject((source: SourceRecord) => source.kind === SourceKind.Search || isValidUrl(source.url)),
     R.map((source: SourceRecord) => `Source has invalid URL: ${source.url}`)
   )(sources);
-  return [...duplicateCompetitors, ...duplicateUrls, ...unknownCompetitors, ...badUrls];
+  const emptyQueries = R.pipe(
+    R.filter((source: SourceRecord) => source.kind === SourceKind.Search && source.url.trim().length === 0),
+    R.map((source: SourceRecord) => `Search source has empty query: ${source.name}`)
+  )(sources);
+  return [...duplicateCompetitors, ...duplicateUrls, ...unknownCompetitors, ...badUrls, ...emptyQueries];
 };
 
 export {

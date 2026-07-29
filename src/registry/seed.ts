@@ -169,6 +169,25 @@ const HEALTHCARE_SOURCES: SourceRecord[] = [
   healthcareSource(SourceKind.Crawl, "Healthcare IT News", "https://www.healthcareitnews.com/")
 ];
 
+/**
+ * Search sources (2026-07-29): the url field carries the Firecrawl news-search query.
+ * Weekly in W2, 2 credits per query. See docs/sources-v5-search-queries.md.
+ */
+const SEARCH_SOURCES: SourceRecord[] = [
+  insuranceSource(SourceKind.Search, "Search: insurance TCPA/telemarketing",
+    "insurance TCPA telemarketing enforcement lawsuit"),
+  insuranceSource(SourceKind.Search, "Search: insurance call recording",
+    "insurance call recording consent regulation"),
+  insuranceSource(SourceKind.Search, "Search: NAIC market conduct",
+    "NAIC market conduct insurance regulation enforcement"),
+  healthcareSource(SourceKind.Search, "Search: HIPAA patient communications",
+    "HIPAA enforcement patient communications texting"),
+  healthcareSource(SourceKind.Search, "Search: telehealth TCPA",
+    "telehealth healthcare TCPA robocall enforcement"),
+  healthcareSource(SourceKind.Search, "Search: healthcare call center compliance",
+    "hospital healthcare call center HIPAA compliance violation")
+];
+
 const SEED_SOURCES: SourceRecord[] = [
   ...REGULATOR_FEEDS,
   ...TRADE_PRESS_FEEDS,
@@ -177,7 +196,8 @@ const SEED_SOURCES: SourceRecord[] = [
   ...JOB_BOARDS,
   ...CRAWL_TARGETS,
   ...INSURANCE_SOURCES,
-  ...HEALTHCARE_SOURCES
+  ...HEALTHCARE_SOURCES,
+  ...SEARCH_SOURCES
 ];
 
 const SEED_NOTES: string[] = [
@@ -214,7 +234,11 @@ const SEED_NOTES: string[] = [
     "Healthcare (add one later if the healthcare digest runs thin), HIPAA Pulse (vendor skew), " +
     "JD Supra Telehealth/Privacy/ConsumerProtection (noise/overlap with TCPAWorld), OCR breach " +
     "portal (JSF form, not crawl-friendly), CA DOI/TX TDI (lower priority than NY DFS). See " +
-    "docs/sources-insurance-candidates.md and docs/sources-healthcare-candidates.md."
+    "docs/sources-insurance-candidates.md and docs/sources-healthcare-candidates.md.",
+  "Sources-v5 (2026-07-29): six Firecrawl news-search queries added as kind=search rows (url " +
+    "field holds the query) after the first insurance/healthcare cycle showed feeds alone " +
+    "under-cover those verticals. Weekly in W2, 2 credits per query, classify on title+snippet. " +
+    "See docs/sources-v5-search-queries.md."
 ];
 
 export { SEED_COMPETITORS, SEED_NOTES, SEED_SOURCES };

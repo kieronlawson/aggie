@@ -37,6 +37,7 @@ on:
           - feed
           - job_board
           - crawl
+          - search
       url:
         description: "Source URL (add-source / set-source-active)"
         required: false

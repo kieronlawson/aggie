@@ -33,6 +33,15 @@ classify prompt must distinguish scheduled-future maintenance from occurred outa
 alerts build on the `outage` classification. Phase 4's "add their cron entries to
 `w3-report.yml`" is also superseded — the scheduled W3 run already reports every vertical with
 registered sources.
+**Amendment (2026-07-29, Kieron, later same day):** phase 4 gains a third source modality —
+**Firecrawl news search** (`SourceKind.Search`; the registry `url` field carries the query).
+Rationale: the first insurance/healthcare cycle showed feeds alone under-cover those verticals
+(insurance 0 relevant items from ~85 in-window; the best insurance/healthcare publishers are
+feedless or WAF-gated). Search queries run in the Saturday W2 job at 2 credits per query
+(news-category, 10 results, no scraping; classify on title+snippet) and flow through the normal
+P pipeline. Kieron chose Firecrawl search over Google News RSS (redirect-link URLs would break
+canonical linking and dedupe; Firecrawl is already in the approved service set). Queries are
+documented in `docs/sources-v5-search-queries.md`.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 

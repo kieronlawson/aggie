@@ -5,8 +5,9 @@
 Actions → **w0-registry** → Run workflow. Pick the command and fill the relevant fields:
 
 - `add-competitor`: name, relationship (displace/partner), aliases (comma-separated).
-- `add-source`: name, kind (feed/job_board/crawl), url, vertical, competitor (empty for
-  regulatory sources — the competitor must already exist, typos are rejected).
+- `add-source`: name, kind (feed/job_board/crawl/search), url, vertical, competitor (empty for
+  regulatory sources — the competitor must already exist, typos are rejected). For `search`
+  sources the url field carries the Firecrawl news-search query, not a URL.
 - `set-source-active`: url + active true/false — use this to disable a dead source.
 - `seed`: re-applies the checked-in seed (`src/registry/seed.ts`). Idempotent.
 

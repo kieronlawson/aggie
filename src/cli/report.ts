@@ -129,7 +129,8 @@ const main = async (): Promise<void> => {
   const reportDate = new Date().toISOString().slice(0, DATE_LENGTH);
   const feedSources = await loadActiveSources(SourceKind.Feed);
   const crawlSources = await loadActiveSources(SourceKind.Crawl);
-  const sources = [...feedSources, ...crawlSources];
+  const searchSources = await loadActiveSources(SourceKind.Search);
+  const sources = [...feedSources, ...crawlSources, ...searchSources];
   const verticals = requested.length === 0 ? sourcedVerticals(sources) : [parseVertical(requested)];
   const outcomes = await sequentially(verticals, (vertical) =>
     reportVerticalSafely({ vertical, force, reportDate, sources })

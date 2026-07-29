@@ -116,4 +116,15 @@ describe("validateRegistry", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("invalid URL");
   });
+
+  it("accepts search sources whose url field is a query, not a URL", () => {
+    const errors = validateRegistry([], [source({ kind: SourceKind.Search, url: "insurance TCPA enforcement" })]);
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects search sources with an empty query", () => {
+    const errors = validateRegistry([], [source({ kind: SourceKind.Search, url: "  " })]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("empty query");
+  });
 });

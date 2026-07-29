@@ -14,7 +14,8 @@ enum Relationship {
 enum SourceKind {
   Feed = "feed",
   JobBoard = "job_board",
-  Crawl = "crawl"
+  Crawl = "crawl",
+  Search = "search"
 }
 
 type CompetitorRecord = {

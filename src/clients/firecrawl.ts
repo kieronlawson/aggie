@@ -46,6 +46,34 @@ const scrapeRaw = async (url: string): Promise<string> => {
   return raw;
 };
 
+type SearchNewsResult = {
+  title?: string;
+  url?: string;
+  snippet?: string;
+  date?: string;
+};
+
+type SearchResponse = {
+  success: boolean;
+  data?: { news?: SearchNewsResult[] };
+};
+
+/** News-category search; costs 2 credits per 10 results, no scraping. */
+const searchNews = async (query: string, limit: number): Promise<SearchNewsResult[]> => {
+  const response = await fetch(`${FIRECRAWL_API_BASE}/search`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ query, sources: ["news"], limit })
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Firecrawl search failed for "${query}": HTTP ${String(response.status)} ${await response.text()}`
+    );
+  }
+  const payload = (await response.json()) as SearchResponse;
+  return payload.data?.news ?? [];
+};
+
 enum ChangeStatus {
   New = "new",
   Same = "same",
@@ -161,5 +189,7 @@ export {
   getBatchResults,
   remainingCredits,
   scrapeRaw,
+  searchNews,
+  type SearchNewsResult,
   startChangeTrackingBatch
 };

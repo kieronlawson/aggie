@@ -8,6 +8,7 @@ import {
   type CrawlPageResult,
   getBatchResults,
   remainingCredits,
+  searchNews,
   startChangeTrackingBatch
 } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
@@ -15,6 +16,7 @@ import { queryRows } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { crawlRawItem } from "#src/pipeline/crawl.ts";
 import { itemsNamespaceFor, ProcessOutcome, processRawItem } from "#src/pipeline/process.ts";
+import { searchRawItem } from "#src/pipeline/search.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
 import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
@@ -149,13 +151,10 @@ const summarize = (input: SummaryInput): string => {
   return [headline, ...unmatchedLine, ...failureLines].join("\n");
 };
 
-const main = async (): Promise<void> => {
+const runCrawlStage = async (relationshipByName: Record<string, Relationship>): Promise<string> => {
   const sources = await loadActiveSources(SourceKind.Crawl);
   if (sources.length === 0) {
-    const note = "📭 Aggie crawl: no active crawl sources — nothing to check.";
-    console.log(note);
-    await postMessage(SlackChannel.IntelStaging, note);
-    return;
+    return "📭 Aggie crawl: no active crawl sources — nothing to check.";
   }
   const credits = await remainingCredits();
   if (credits < sources.length) {
@@ -164,10 +163,6 @@ const main = async (): Promise<void> => {
         `${String(sources.length)} pages need checking`
     );
   }
-  const competitors = await loadCompetitors();
-  const relationshipByName = R.fromPairs(
-    R.map((competitor) => [competitor.name, competitor.relationship] as [string, Relationship], competitors)
-  );
   const jobId = await startChangeTrackingBatch(R.map((source: SourceRecord) => source.url, sources));
   const results = await pollUntilDone(jobId, Date.now() + POLL_TIMEOUT_MS);
   const sourcesByUrl = R.indexBy(R.prop("url"), sources);
@@ -183,7 +178,7 @@ const main = async (): Promise<void> => {
   const failures = R.reject(R.isEmpty, R.map((p: ProcessResult) => p.failure, processed));
   const changedCount = R.count((m: MatchedPage) => m.page.changeStatus === ChangeStatus.Changed, matched);
   const newCount = R.count((m: MatchedPage) => m.page.changeStatus === ChangeStatus.New, matched);
-  const summary = summarize({
+  return summarize({
     totalPages: results.pages.length,
     unmatchedCount: unmatchedUrls.length,
     changed: changedCount,
@@ -194,6 +189,68 @@ const main = async (): Promise<void> => {
     merged: R.count((p: ProcessResult) => p.outcome === ProcessOutcome.Merged, processed),
     failures
   });
+};
+
+const SEARCH_RESULT_LIMIT = 10;
+
+type SearchOutcome = {
+  fetched: number;
+  unseen: number;
+  stored: number;
+  merged: number;
+  failure: string;
+};
+
+const isRawItem = (value: RawItem | null): value is RawItem => value !== null;
+
+const searchSource = async (source: SourceRecord, nowMs: number): Promise<SearchOutcome> => {
+  try {
+    const results = await searchNews(source.url, SEARCH_RESULT_LIMIT);
+    const mapped = R.filter(
+      isRawItem,
+      R.map((result) => searchRawItem({ source, result, nowMs }), results)
+    );
+    const fresh = R.uniqBy((item: RawItem) => item.url, mapped);
+    const seen = await seenUrlsForVertical(source.vertical, R.map((item: RawItem) => item.url, fresh));
+    const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
+    const outcomes = await sequentially(unseen, processRawItem);
+    return {
+      fetched: results.length,
+      unseen: unseen.length,
+      stored: R.count((outcome) => outcome === ProcessOutcome.Stored, outcomes),
+      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes),
+      failure: ""
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { fetched: 0, unseen: 0, stored: 0, merged: 0, failure: `${source.name}: ${detail}` };
+  }
+};
+
+const runSearchStage = async (): Promise<string> => {
+  const sources = await loadActiveSources(SourceKind.Search);
+  if (sources.length === 0) {
+    return "";
+  }
+  const nowMs = Date.now();
+  const outcomes = await sequentially(sources, (source) => searchSource(source, nowMs));
+  const total = (key: keyof Omit<SearchOutcome, "failure">): number =>
+    R.sum(R.map((outcome: SearchOutcome) => outcome[key], outcomes));
+  const failures = R.reject(R.isEmpty, R.map((outcome: SearchOutcome) => outcome.failure, outcomes));
+  const headline =
+    `🔎 Aggie search: ${String(sources.length)} queries — ${String(total("fetched"))} results, ` +
+    `${String(total("unseen"))} fresh/unseen; stored ${String(total("stored"))}, merged ${String(total("merged"))}.`;
+  return [headline, ...R.map((failure: string) => `⚠️ ${failure}`, failures)].join("\n");
+};
+
+const main = async (): Promise<void> => {
+  const competitors = await loadCompetitors();
+  const relationshipByName = R.fromPairs(
+    R.map((competitor) => [competitor.name, competitor.relationship] as [string, Relationship], competitors)
+  );
+  const crawlSummary = await runCrawlStage(relationshipByName);
+  const searchSummary = await runSearchStage();
+  const summary = R.reject(R.isEmpty, [crawlSummary, searchSummary]).join("\n");
   console.log(summary);
   await postMessage(SlackChannel.IntelStaging, summary);
 };

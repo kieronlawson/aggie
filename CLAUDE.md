@@ -9,12 +9,11 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**Current status: phase 3 gate passed 2026-07-29 (crawl-sourced page changes appeared correctly
-classified in the 2026-07-26 digest). Phase 4 in progress: insurance/healthcare sources seeded
-2026-07-29; gate acceptance is three vertical-correct digests on a Sunday. The alert branch
-follows phase 4 — before it builds, the classify prompt must learn to distinguish
-scheduled-future maintenance from occurred outages (see the plan's 2026-07-29 amendment).** The
-source of truth is:
+**Current status: phase 4 gate passed 2026-08-03 — Kieron confirmed the 2026-08-02 Sunday
+digests for finance, insurance, and healthcare were vertical-correct in staging; all three
+promoted to `#intel-digest` and the stored digests reposted there. Next: the alert branch —
+before it builds, the classify prompt must learn to distinguish scheduled-future maintenance
+from occurred outages (see the plan's 2026-07-29 amendment).** The source of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,
   classification schema, report format, resolved decisions.
@@ -40,8 +39,9 @@ a phase before the previous gate has passed.
 - **All build-time output posts to `#intel-staging`** until the relevant phase gate promotes it
   to `#intel-digest` / `#intel-competitive` (renamed from `#competitive-intel` 2026-07-24). The
   promotion mechanism is `channelFor` in `src/cli/report.ts` — one line per promoted vertical.
-  Competitor is promoted: all competitive output (digest, and alerts once built) goes to
-  `#intel-competitive`. Ops posts (📭/❌) always stay in staging.
+  All four verticals are promoted: competitive output (digest, and alerts once built) goes to
+  `#intel-competitive`; finance/insurance/healthcare digests go to `#intel-digest` (promoted
+  2026-08-03). Ops posts (📭/❌) always stay in staging.
 - Respect the spec's non-goals: no UI, no auth, no scraping of G2/Capterra/LinkedIn, no real-time
   pipeline, no services beyond Firecrawl, TurboPuffer, GitHub, Anthropic, and Voyage.
 

@@ -52,10 +52,11 @@ const storedReport = async (vertical: Vertical, reportDate: string): Promise<Sto
 
 /**
  * Promotion map: a vertical's digest moves out of staging when its gate passes.
- * Competitor promoted 2026-07-24 (Kieron); ops posts (📭/❌) always stay in staging.
+ * Competitor promoted 2026-07-24; finance/insurance/healthcare promoted 2026-08-03
+ * (Kieron, phase 4 gate). Ops posts (📭/❌) always stay in staging.
  */
 const channelFor = (vertical: Vertical): SlackChannel =>
-  vertical === Vertical.Competitor ? SlackChannel.IntelCompetitive : SlackChannel.IntelStaging;
+  vertical === Vertical.Competitor ? SlackChannel.IntelCompetitive : SlackChannel.IntelDigest;
 
 const deliverToSlack = async (channel: SlackChannel, { card, replies }: DigestMessages): Promise<void> => {
   const threadTs = await postMessage(channel, card.text, card.blocks);

@@ -198,6 +198,8 @@ const SEARCH_RESULT_LIMIT = 10;
 type SearchOutcome = {
   fetched: number;
   noUrl: number;
+  social: number;
+  listing: number;
   undated: number;
   stale: number;
   alreadySeen: number;
@@ -210,6 +212,8 @@ type SearchOutcome = {
 const EMPTY_SEARCH_OUTCOME: SearchOutcome = {
   fetched: 0,
   noUrl: 0,
+  social: 0,
+  listing: 0,
   undated: 0,
   stale: 0,
   alreadySeen: 0,
@@ -247,6 +251,8 @@ const searchSource = async (source: SourceRecord, nowMs: number): Promise<Search
       ...EMPTY_SEARCH_OUTCOME,
       fetched: results.length,
       noUrl: drops[SearchDrop.NoUrl] ?? 0,
+      social: drops[SearchDrop.Social] ?? 0,
+      listing: drops[SearchDrop.Listing] ?? 0,
       undated: drops[SearchDrop.Undated] ?? 0,
       stale: drops[SearchDrop.Stale] ?? 0,
       alreadySeen: fresh.length - unseen.length,
@@ -272,7 +278,8 @@ const runSearchStage = async (): Promise<string> => {
   const failures = R.reject(R.isEmpty, R.map((outcome: SearchOutcome) => outcome.failure, outcomes));
   const headline =
     `🔎 Aggie search: ${String(sources.length)} queries — ${String(total("fetched"))} results ` +
-    `(${String(total("noUrl"))} no-url, ${String(total("undated"))} undated, ${String(total("stale"))} stale, ` +
+    `(${String(total("noUrl"))} no-url, ${String(total("social"))} social, ${String(total("listing"))} listing, ` +
+    `${String(total("undated"))} undated, ${String(total("stale"))} stale, ` +
     `${String(total("alreadySeen"))} already seen), ${String(total("unseen"))} fresh/unseen; ` +
     `stored ${String(total("stored"))}, merged ${String(total("merged"))}.`;
   return [headline, ...R.map((failure: string) => `⚠️ ${failure}`, failures)].join("\n");

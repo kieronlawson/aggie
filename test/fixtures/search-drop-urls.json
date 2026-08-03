@@ -1,0 +1,17 @@
+[
+  { "url": "https://www.facebook.com/61586770643203/posts/nobody-picks-up-their-phone-anymore/122131660095225688/", "expected": "social" },
+  { "url": "https://www.facebook.com/groups/2362056047247739/posts/27599904469702882/", "expected": "social" },
+  { "url": "https://www.instagram.com/p/DbLpIwckmZN/", "expected": "social" },
+  { "url": "https://www.instagram.com/reel/DbYHsI4lGEA/", "expected": "social" },
+  { "url": "https://x.com/fcc/status/1815000000000000000", "expected": "social" },
+  { "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "expected": "social" },
+  { "url": "https://natlawreview.com/type-law/litigation-trial-practice?_wrapper_format=html&title=&order=title&sort=desc&page=1309", "expected": "listing" },
+  { "url": "https://www.hhs.gov/ocr/newsroom/index.html", "expected": "listing" },
+  { "url": "https://insurancenewsnet.com/", "expected": "listing" },
+  { "url": "https://example.com/news?page=2", "expected": "listing" },
+  { "url": "https://natlawreview.com/article/trending-telehealth-june-2026", "expected": "ok" },
+  { "url": "https://www.jdsupra.com/legalnews/courts-continue-to-depart-from-fcc-tcpa-8704048/", "expected": "ok" },
+  { "url": "https://example.com/page/deep-dive-on-tcpa", "expected": "ok" },
+  { "url": "https://example.com/homepage-redesign-article", "expected": "ok" },
+  { "url": "https://linkedin.com.evil.com/spoofed-host", "expected": "ok" }
+]

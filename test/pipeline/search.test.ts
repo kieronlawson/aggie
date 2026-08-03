@@ -1,7 +1,13 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { SearchDrop, searchPublishedAt, searchRawItem } from "#src/pipeline/search.ts";
 import { SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
+
+const dropFixtures = JSON.parse(
+  readFileSync(new URL("../fixtures/search-drop-urls.json", import.meta.url), "utf8")
+) as { url: string; expected: string }[];
 
 const NOW_MS = Date.parse("2026-07-29T12:00:00.000Z");
 
@@ -66,5 +72,11 @@ describe("searchRawItem", () => {
   it("drops results without a usable URL", () => {
     const { url: _url, ...unlinked } = result;
     expect(searchRawItem({ source, result: unlinked, nowMs: NOW_MS })).toBe(SearchDrop.NoUrl);
+  });
+
+  it.each(dropFixtures)("classifies $url as $expected", ({ url, expected }) => {
+    const mapped = searchRawItem({ source, result: { ...result, url }, nowMs: NOW_MS });
+    const actual = typeof mapped === "string" ? mapped : "ok";
+    expect(actual).toBe(expected);
   });
 });

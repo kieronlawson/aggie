@@ -1,4 +1,7 @@
+import * as R from "ramda";
+
 import { type SearchNewsResult } from "#src/clients/firecrawl.ts";
+import { isOriginatingDomain } from "#src/pipeline/canonical.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { Relationship, type SourceRecord } from "#src/registry/types.ts";
 
@@ -43,15 +46,46 @@ type SearchItemOpts = {
 
 enum SearchDrop {
   NoUrl = "no-url",
+  Social = "social",
+  Listing = "listing",
   Undated = "undated",
   Stale = "stale"
 }
 
+/** Social posts surface in web search results but are never citable articles. */
+const SOCIAL_DOMAINS = ["facebook.com", "instagram.com", "linkedin.com", "x.com", "twitter.com", "tiktok.com", "youtube.com"];
+
+const LISTING_QUERY_PARAMS = ["page", "_wrapper_format"];
+const INDEX_PATH_PATTERN = /\/index\.html?$/u;
+const ROOT_PATH = "/";
+
+/** True for listing/index/pagination pages — navigation surfaces, not articles. */
+const isListingUrl = (url: string): boolean => {
+  const parsed = URL.parse(url);
+  if (parsed === null) {
+    return false;
+  }
+  const hasListingParam = R.any((param: string) => parsed.searchParams.has(param), LISTING_QUERY_PARAMS);
+  return hasListingParam || parsed.pathname === ROOT_PATH || INDEX_PATH_PATTERN.test(parsed.pathname);
+};
+
+/** URL-shape drops: missing, social post, or listing page. */
+const urlDrop = (url: string): SearchDrop | null => {
+  if (!url.startsWith("http")) {
+    return SearchDrop.NoUrl;
+  }
+  if (isOriginatingDomain(url, SOCIAL_DOMAINS)) {
+    return SearchDrop.Social;
+  }
+  return isListingUrl(url) ? SearchDrop.Listing : null;
+};
+
 /** Maps a search result to a RawItem for P, or the reason it was dropped. */
 const searchRawItem = ({ source, result, nowMs }: SearchItemOpts): RawItem | SearchDrop => {
   const url = result.url ?? "";
-  if (!url.startsWith("http")) {
-    return SearchDrop.NoUrl;
+  const drop = urlDrop(url);
+  if (drop !== null) {
+    return drop;
   }
   const publishedAt = searchPublishedAt(result.date ?? "", nowMs);
   if (publishedAt.length === 0) {

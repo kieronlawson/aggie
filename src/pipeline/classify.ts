@@ -52,7 +52,10 @@ const SYSTEM_PROMPT =
   "podcast/webinar/event or studio announcements), vendor product marketing, and " +
   "content-marketing explainers or listicles. A law-firm or vendor post is relevant only when " +
   "its substance is a specific regulatory or legal development — a filing, ruling, enforcement " +
-  "action, or rule change — reported as news, not the author's involvement or services.\n" +
+  "action, or rule change — reported as news, not the author's involvement or services. This " +
+  "exclusion never applies to intelligence about the (b) companies: a tracked competitor's own " +
+  "product launches, pricing moves, or website/pricing-page changes are relevant even when " +
+  "promotional in tone.\n" +
   "Set relevant=false for scheduled or planned maintenance notices — status-page announcements " +
   "of upcoming or routine maintenance windows, even after the window has passed. Only unplanned " +
   "incidents that actually occurred (outages, degradations, service disruptions) are relevant " +

@@ -64,6 +64,13 @@ Every change to a tuning threshold, with date and reason. Current values:
   13G-amendment cluster, and an 8x8 officer-change 8-K. Stored items re-judged via the
   relevance backfill.
 
+- 2026-08-03 — Scoped the self-promotional exclusion away from tracked competitors: a (b)-list
+  company's own product launches, pricing moves, and website/pricing-page changes stay relevant
+  even when promotional in tone. Reason: the relevance backfill that removed the digest noise
+  also dropped crawl-sourced competitor page changes (8x8 Eva chat-agent launch, Aircall chat
+  widget) from a staging rehearsal — the classifier had over-applied the vendor-marketing
+  exclusion, which targets third-party content, to competitor intel.
+
 - 2026-08-03 — Synthesis prompt edits: empty Continuing-stories sections are omitted instead of
   writing "None." (blocks.ts also skips "None."-bodied sections so old stored digests repost
   cleanly), and signal bullets must end with a real markdown link or a plain source name —

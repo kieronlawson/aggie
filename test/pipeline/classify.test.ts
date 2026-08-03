@@ -148,6 +148,10 @@ describe("maintenance and SEC-filing rules in prompt", () => {
     expect(SYSTEM_PROMPT).toContain("Schedule 13D/13G");
     expect(SYSTEM_PROMPT).toContain("officer/director changes");
   });
+
+  it("keeps tracked-competitor product and pricing intel despite the marketing exclusion", () => {
+    expect(SYSTEM_PROMPT).toContain("even when promotional in tone");
+  });
 });
 
 describe("vertical and self-promo rules in prompt", () => {

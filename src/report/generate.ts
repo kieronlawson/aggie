@@ -120,6 +120,43 @@ const summarizeCluster = async (cluster: ReportItem[]): Promise<string> =>
 const isEvergreen = (item: ReportItem): boolean =>
   item.content_kind === (ContentKind.Evergreen as string);
 
+/** Digest size caps — tuning thresholds, changes logged in docs/tuning-log.md. */
+const WORTH_A_READ_CAP = 5;
+const DETAILS_STORY_CAP = 10;
+const PER_DOMAIN_CAP = 3;
+
+const WWW_PREFIX = "www.";
+
+const itemDomain = (url: string): string => {
+  const parsed = URL.parse(url);
+  const host = parsed === null ? "" : parsed.hostname;
+  return host.startsWith(WWW_PREFIX) ? host.slice(WWW_PREFIX.length) : host;
+};
+
+type DomainCapAccumulator = { counts: Record<string, number>; kept: ReportItem[] };
+
+/** Items arrive newest-first; keeps the first `cap` per domain so one blog cannot flood a digest. */
+const capPerDomain = (items: ReportItem[], cap: number): ReportItem[] => {
+  const step = (acc: DomainCapAccumulator, item: ReportItem): DomainCapAccumulator => {
+    const domain = itemDomain(item.url);
+    const count = acc.counts[domain] ?? 0;
+    return count >= cap ? acc : { counts: { ...acc.counts, [domain]: count + 1 }, kept: [...acc.kept, item] };
+  };
+  return R.reduce(step, { counts: {}, kept: [] }, items).kept;
+};
+
+const newestPublishedMs = (cluster: ReportItem[]): number => {
+  const parsed = R.map((item: ReportItem) => Date.parse(item.published_at), cluster);
+  return R.reduce(R.max<number>, 0, R.reject(Number.isNaN, parsed));
+};
+
+/** Multi-source stories beat one-off posts; ties break newest-first. */
+const capClusters = (clusters: ReportItem[][], cap: number): ReportItem[][] =>
+  R.take(
+    cap,
+    R.sortWith([R.descend((cluster: ReportItem[]) => cluster.length), R.descend(newestPublishedMs)], clusters)
+  );
+
 const WORTH_A_READ_HEADING = "## 📚 Worth a read";
 
 const worthAReadSection = (items: ReportItem[]): string =>
@@ -232,11 +269,11 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
   }
   const itemSources = R.uniq(R.map((item: ReportItem) => item.source, items));
   const [evergreen, news] = R.partition(isEvergreen, items);
-  const reading = worthAReadSection(evergreen);
+  const reading = worthAReadSection(R.take(WORTH_A_READ_CAP, evergreen));
   if (news.length === 0) {
     return { body: reading, clusters: 0, items: items.length, itemSources };
   }
-  const clusters = clusterItems(news);
+  const clusters = capClusters(clusterItems(capPerDomain(news, PER_DOMAIN_CAP)), DETAILS_STORY_CAP);
   const summaries = await sequentially(clusters, summarizeCluster);
   const previousBody = await latestReportBody(vertical);
   const synthesized = await askText(
@@ -250,14 +287,20 @@ const generateDigestBody = async (vertical: Vertical): Promise<GeneratedReport> 
 };
 
 export {
+  capClusters,
+  capPerDomain,
   clusterSummaryPrompt,
+  DETAILS_STORY_CAP,
   fetchWeekItems,
   generateDigestBody,
   isEvergreen,
+  itemDomain,
   latestReportBody,
+  PER_DOMAIN_CAP,
   type ReportItem,
   SYNTHESIS_SYSTEM,
   synthesisPrompt,
   upsertReport,
+  WORTH_A_READ_CAP,
   worthAReadSection
 };

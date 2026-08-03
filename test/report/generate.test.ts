@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { Vertical } from "#src/registry/types.ts";
-import { clusterSummaryPrompt, isEvergreen, SYNTHESIS_SYSTEM, synthesisPrompt, worthAReadSection } from "#src/report/generate.ts";
+import {
+  capClusters,
+  capPerDomain,
+  clusterSummaryPrompt,
+  isEvergreen,
+  itemDomain,
+  SYNTHESIS_SYSTEM,
+  synthesisPrompt,
+  worthAReadSection
+} from "#src/report/generate.ts";
 
 describe("SYNTHESIS_SYSTEM", () => {
   it("grounds the model in Spoke's product and verticals", () => {
@@ -124,5 +133,62 @@ describe("evergreen handling", () => {
 
   it("renders nothing when there are no evergreen items", () => {
     expect(worthAReadSection([])).toBe("");
+  });
+});
+
+describe("itemDomain", () => {
+  it("strips www and returns the bare hostname", () => {
+    expect(itemDomain("https://www.finra.org/media-center/x")).toBe("finra.org");
+    expect(itemDomain("https://tcpaworld.com/2026/07/28/post/")).toBe("tcpaworld.com");
+  });
+
+  it("returns empty for garbage URLs", () => {
+    expect(itemDomain("not a url")).toBe("");
+  });
+});
+
+const itemFrom = (url: string, publishedAt: string): typeof ITEM => ({
+  ...ITEM,
+  url,
+  published_at: publishedAt
+});
+
+describe("capPerDomain", () => {
+  const tcpaworld = [...Array(8).keys()].map((n) =>
+    itemFrom(`https://tcpaworld.com/post-${String(n)}`, `2026-07-2${String(8 - n)}`)
+  );
+  const others = [
+    itemFrom("https://natlawreview.com/article/one", "2026-07-30"),
+    itemFrom("https://www.jdsupra.com/legalnews/two", "2026-07-24")
+  ];
+
+  it("keeps only the first N items per domain, preserving order", () => {
+    const mixed = [others[0], ...tcpaworld, others[1]] as typeof tcpaworld;
+    const capped = capPerDomain(mixed, 3);
+    expect(capped.map((item) => item.url)).toEqual([
+      "https://natlawreview.com/article/one",
+      "https://tcpaworld.com/post-0",
+      "https://tcpaworld.com/post-1",
+      "https://tcpaworld.com/post-2",
+      "https://www.jdsupra.com/legalnews/two"
+    ]);
+  });
+
+  it("passes everything through when under the cap", () => {
+    expect(capPerDomain(others, 3)).toEqual(others);
+  });
+});
+
+describe("capClusters", () => {
+  const single = [itemFrom("https://a.com/1", "2026-07-31")];
+  const older = [itemFrom("https://b.com/1", "2026-07-20")];
+  const multi = [itemFrom("https://c.com/1", "2026-07-21"), itemFrom("https://d.com/1", "2026-07-22")];
+
+  it("prefers larger clusters, then newer ones", () => {
+    expect(capClusters([single, older, multi], 2)).toEqual([multi, single]);
+  });
+
+  it("passes everything through when under the cap", () => {
+    expect(capClusters([single, multi], 5)).toHaveLength(2);
   });
 });

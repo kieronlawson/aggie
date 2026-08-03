@@ -7,6 +7,9 @@ Every change to a tuning threshold, with date and reason. Current values:
 | Dedupe candidate similarity (layer 2) | `src/pipeline/process.ts` `DEDUPE_SIMILARITY_THRESHOLD` | 0.90 |
 | Alert sentiment (complaint/outage) | arrives in phase 2 | `moderate` (planned) |
 | Report cluster similarity | `src/report/cluster.ts` `CLUSTER_SIMILARITY_THRESHOLD` | 0.85 |
+| Worth-a-read items per digest | `src/report/generate.ts` `WORTH_A_READ_CAP` | 5 |
+| Details stories per digest | `src/report/generate.ts` `DETAILS_STORY_CAP` | 10 |
+| News items per source domain | `src/report/generate.ts` `PER_DOMAIN_CAP` | 3 |
 
 ## Changes
 
@@ -43,3 +46,9 @@ Every change to a tuning threshold, with date and reason. Current values:
   content-marketing explainers are relevant=false even when on-topic. Reason: the 2026-08-02
   finance digest included a podcast studio-format announcement and a law-firm settlement promo;
   8 of its 16 stories came from tcpaworld.com.
+
+- 2026-08-03 — Added digest size caps: 5 Worth-a-read items, 10 Details stories (multi-source
+  clusters ranked above one-off posts, then newest first), 3 news items per source domain.
+  Reason: the 2026-08-02 healthcare digest listed 14 uncapped vendor-SEO evergreen items, and
+  tcpaworld.com supplied half of finance's 16 stories. Caps apply before cluster summarization,
+  so trimmed items also cost no model spend.

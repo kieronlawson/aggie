@@ -1,7 +1,9 @@
 # Article retrieval — feed enrichment + crawl index expansion: design
 
 Date: 2026-07-24
-Status: draft — awaiting Kieron's review (spec only; no build yet, another agent is active in the repo)
+Status: draft — awaiting Kieron's review (spec only; no build yet)
+Amended 2026-08-03 (Kieron): no length threshold — retrieve the article for EVERY fresh item.
+Search-sourced items (added since the first draft; content = title + snippet) are covered too.
 
 ## Problem
 
@@ -33,23 +35,32 @@ new dependency (readability/jsdom); Firecrawl already extracts to markdown, abso
 hosts (the same WAF/Cloudflare walls the source research kept hitting), and is an approved
 service. Cost: 1 credit per article. Plain `fetch` is NOT used for article bodies.
 
-## Call site 1 — feed enrichment (W1 ingest)
+## Call site 1 — feed items (W1 ingest) and search items (W2 crawl)
 
-1. After the seen-URL filter (fresh items only — re-runs never re-scrape), items where
-   `content.trim().length < ENRICH_THRESHOLD_CHARS` (initial **600**; changes logged in
-   `docs/tuning-log.md`) are enriched: `scrapeMarkdown(item.url)` → content becomes the
-   markdown (truncated to the existing `NEW_PAGE_CHARS` 20k). Feed title is kept (feeds are
-   authoritative for titles; scrape titles carry site chrome).
-2. Enrichment failure is soft: keep the feed-supplied content, item still flows through P, ⚠️
-   collected into the existing per-source failure reporting. A thin item beats a lost item.
-3. Credits guard: before enriching, `remainingCredits()` must cover the enrichment count for
-   this run; if not, skip ALL enrichment (items flow thin) and post one ⚠️ saying so. Ingest
-   itself never blocks on enrichment.
-4. Scrapes run through `sequentially` (429 lesson from the first W2 live run: never fan out
+1. After the seen-URL filter (fresh items only — re-runs never re-scrape), EVERY item is
+   retrieved: `scrapeMarkdown(item.url)` → content becomes the markdown (truncated to the
+   existing `NEW_PAGE_CHARS` 20k). No length threshold: a character count is a proxy for "is
+   this the full article?" and misclassifies medium-length abstracts — the analysed text must
+   be the actual article whenever the article is reachable, uniformly. Feed/search title is
+   kept (source titles are authoritative; scrape titles carry site chrome).
+2. Retrieval failure is soft: keep the source-supplied content (feed body, or title+snippet
+   for search items), item still flows through P, ⚠️ collected into the existing per-source
+   failure reporting. A thin item beats a lost item.
+3. Accepted tradeoff: full-text feeds (e.g. HIPAA Journal ships ~4.5k-char `content:encoded`)
+   get re-scraped even though the feed body was already complete — and a scraped page can
+   carry nav/related-post chrome the feed body didn't. Uniformity and the credibility
+   guarantee win over per-source cleverness; revisit only if chrome measurably degrades
+   classification.
+4. Credits guard: before retrieving, `remainingCredits()` must cover the fresh-item count for
+   this run; if not, skip ALL retrieval (items flow thin) and post one ⚠️ saying so. Ingest
+   itself never blocks on retrieval.
+5. Scrapes run through `sequentially` (429 lesson from the first W2 live run: never fan out
    unbounded requests against Firecrawl's req/min limit).
 
-Volume estimate: only the thin items pay — the regulator feeds, ~5–15 fresh items/day →
-~50–100 credits/week. Full-text feeds (most of trade press) never trigger it.
+Volume: every fresh item pays 1 credit — order of a few hundred credits/week at current source
+counts, trivial against plan allowances but now proportional to seeded volume; high-volume
+broad feeds (Insurance Journal ~100+/wk) multiply scrape cost as well as noise, one more
+reason the relevance-gated "maybe" feeds stay unseeded until needed.
 
 ## Call site 2 — index expansion (W2 crawl)
 
@@ -76,18 +87,21 @@ Volume estimate: only the thin items pay — the regulator feeds, ~5–15 fresh 
 ## Code changes
 
 - `src/clients/firecrawl.ts` — `scrapeMarkdown` (shares `authHeaders`).
-- `src/pipeline/enrich.ts` (new, pure + one IO fn) — `needsEnrichment(content)`,
-  `enrichRawItem(item, scrape)` content assembly; constants exported.
+- `src/pipeline/enrich.ts` (new, pure) — `enrichRawItem(item, scrape)` content assembly
+  (markdown truncation, title retention, thin fallback); constants exported.
 - `src/pipeline/expand.ts` (new, pure) — `newSameHostLinks(diffText, pageUrl)`,
   `articleRawItem(opts)`.
-- `src/cli/ingest.ts` — enrichment pass between seen-filter and `processRawItem`.
+- `src/cli/ingest.ts` — retrieval pass between seen-filter and `processRawItem` for feed items.
+- `src/cli/crawl.ts` — same retrieval pass for search-sourced fresh items (they are processed
+  here, and `src/pipeline/search.ts` gives them title+snippet content only).
 - `src/cli/crawl.ts` — expansion pass for changed pages; suppression rule; credits re-check.
 - No workflow YAML changes; no registry schema changes (index-vs-leaf needs no flag — the
   diff's link content decides).
 
 ## Testing
 
-Pure tests: `needsEnrichment` boundary (599/600/601), `newSameHostLinks` (markdown links, bare
+Pure tests: `enrichRawItem` (scrape wins, thin fallback on failure, truncation, title
+retention), `newSameHostLinks` (markdown links, bare
 URLs, off-host rejected, removed-line links ignored, cap + overflow, relative links resolved
 against pageUrl), `articleRawItem` shape, suppression logic. Client test: `scrapeMarkdown`
 success/HTTP-error/empty-markdown (fetch-mocked). Entrypoint passes verified by a live
@@ -95,15 +109,15 @@ dispatched run in staging, consistent with W1/W2 practice.
 
 ## Acceptance
 
-A W1 run enriches at least one thin regulator item (its stored content visibly exceeds the feed
+A W1 run stores article bodies for regulator items (stored content visibly exceeds the feed
 description), and a W2 run against a seeded index page (HHS OCR newsroom is the intended first
 target) produces per-article items with real titles, bodies, and canonical URLs in the digest —
-no "page updated" placeholder for pages that yielded articles. Kieron judges digest credibility
-at the phase 4 review.
+no "page updated" placeholder for pages that yielded articles. Kieron judges digest
+credibility.
 
 ## Out of scope
 
 Paywalled/login content (thin fallback is accepted); off-host links (syndication/canonical
 selection already handles cross-domain duplication); retro-enriching items already stored;
-per-feed enrichment config; expanding `new` baseline pages; RSS feeds that already ship full
-text (threshold excludes them naturally).
+per-feed retrieval config; expanding `new` baseline pages; chrome-stripping heuristics for
+scraped pages (revisit only if classification measurably suffers).

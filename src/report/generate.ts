@@ -192,7 +192,9 @@ const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: 
     "Lead-in — 1-2 sentences at the very top, no heading, in Aggie's voice: the week's sharpest " +
       "takeaway as a hook that makes the reader want the rest.",
     "## ⚡ Signals — the 2-3 most actionable stories, one bullet each formatted " +
-      "\"<emoji> **<Role>:** <situation> → <what to do about it>\" ending with the story link. " +
+      "\"<emoji> **<Role>:** <situation> → <what to do about it>\" ending with the story's markdown " +
+      "link [publisher](url); if a story carries no link, end with the source name in plain text — " +
+      'never write empty parentheses "()". ' +
       "Roles and emoji: 💼 Sales, 📣 Marketing, 🛠️ Product, 👔 Leadership. One line per bullet. " +
       'Write "Nothing requiring action this week." if no story is genuinely actionable.',
     "## 🆕 New this week — one bullet per new story cluster: \"**<short title>** — <one-line gist>\" " +
@@ -204,7 +206,7 @@ const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: 
     "## 🔁 Continuing stories — ONLY clusters that also appear in the previous digest AND have something " +
       "new; one sentence each on what changed. If continuing stories exist but none changed, write a " +
       "single line: \"<N> continuing stories, no changes — <title> · <title> · …\". " +
-      'Write "None." if there are no continuing stories.',
+      "Omit the section entirely — heading included — if there are no continuing stories.",
     vertical === Vertical.Competitor
       ? "## Competitor sections — one subsection per competitor with announcements, complaints, and signals. " +
         'Frame partner-relationship items (Theta Lake, Smarsh) as opportunity, adding a "Where we fit" line ' +

@@ -202,8 +202,13 @@ const isOps = (digestSection: DigestSection): boolean =>
 const isCardSection = (digestSection: DigestSection): boolean =>
   hasHeading(SIGNALS_HEADING)(digestSection) || hasHeading(NEW_THIS_WEEK_HEADING)(digestSection);
 
+const EMPTY_SECTION_BODY = "None.";
+
+/** Old stored digests wrote "None." for empty sections; never post those as replies. */
+const isEmptyBody = (body: string): boolean => body.trim().length === 0 || body.trim() === EMPTY_SECTION_BODY;
+
 const replyMessages = (digestSection: DigestSection): BlockMessage[] => {
-  if (isCardSection(digestSection)) {
+  if (isCardSection(digestSection) || isEmptyBody(digestSection.body)) {
     return [];
   }
   if (hasHeading(DETAILS_HEADING)(digestSection)) {

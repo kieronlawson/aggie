@@ -99,7 +99,11 @@ describe("synthesisPrompt", () => {
 
   it("collapses unchanged continuing stories to a single line", () => {
     expect(prompt).toContain("no changes —");
-    expect(prompt).toContain('Write "None." if there are no continuing stories.');
+    expect(prompt).toContain("Omit the section entirely");
+  });
+
+  it("forbids empty parentheses in signals", () => {
+    expect(prompt).toContain('never write empty parentheses "()"');
   });
 
   it("forbids bare URLs in the synthesis output", () => {

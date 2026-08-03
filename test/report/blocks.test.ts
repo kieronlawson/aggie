@@ -132,4 +132,17 @@ describe("digestMessages edge cases", () => {
     expect(signal).toBeDefined();
     expect((signal as { accessory?: unknown }).accessory).toBeUndefined();
   });
+
+  it("skips replies for sections whose body is empty or a bare None.", () => {
+    const body = "Lead.\n\n## 🔁 Continuing stories\n\nNone.\n\n## 📚 Worth a read\n\n";
+    const { replies } = digestMessages(meta, body);
+    expect(replies).toHaveLength(0);
+  });
+
+  it("still posts a continuing-stories reply when the section has content", () => {
+    const body = "Lead.\n\n## 🔁 Continuing stories\n\n- *SEC E-Delivery* — proposal date confirmed.";
+    const { replies } = digestMessages(meta, body);
+    expect(replies).toHaveLength(1);
+    expect(allText(replies[0] as BlockMessage)).toContain("SEC E-Delivery");
+  });
 });

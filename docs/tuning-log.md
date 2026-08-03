@@ -52,3 +52,9 @@ Every change to a tuning threshold, with date and reason. Current values:
   Reason: the 2026-08-02 healthcare digest listed 14 uncapped vendor-SEO evergreen items, and
   tcpaworld.com supplied half of finance's 16 stories. Caps apply before cluster summarization,
   so trimmed items also cost no model spend.
+
+- 2026-08-03 — Synthesis prompt edits: empty Continuing-stories sections are omitted instead of
+  writing "None." (blocks.ts also skips "None."-bodied sections so old stored digests repost
+  cleanly), and signal bullets must end with a real markdown link or a plain source name —
+  never empty parentheses. Reason: the 2026-08-02 digests posted "Continuing stories — None."
+  replies, and the insurance card's signals contained bare "()" where citations belonged.

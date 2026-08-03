@@ -64,6 +64,15 @@ Every change to a tuning threshold, with date and reason. Current values:
   13G-amendment cluster, and an 8x8 officer-change 8-K. Stored items re-judged via the
   relevance backfill.
 
+- 2026-08-03 — Factual-grounding fixes after the RingCentral pricing story failed verification
+  (Kieron's live page showed $20/$25/$35 annual with a 33% badge and Buy-now buttons, contradicting
+  the digest's claimed increase, 28% badge, and demo-gating): (1) crawl-changed items now persist
+  their raw git diff (`diff_text`, capped 20k chars, non-filterable) as auditable ground truth;
+  (2) the crawl batch pins `location` US/en-US and sets `maxAge: 0` so change tracking diffs
+  like-for-like renders instead of geo/AB variants or third-party cached pages; (3) all three
+  rewrite layers (classify summary, cluster summary, synthesis) may only state figures that
+  appear verbatim in their input — no derived, inferred, or rounded numbers.
+
 - 2026-08-03 — Scoped the self-promotional exclusion away from tracked competitors: a (b)-list
   company's own product launches, pricing moves, and website/pricing-page changes stay relevant
   even when promotional in tone. Reason: the relevance backfill that removed the digest noise

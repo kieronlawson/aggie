@@ -51,6 +51,8 @@ type RawItem = {
   vertical: Vertical;
   competitor: string;
   relationship: Relationship;
+  /** Git-style diff for crawl-changed pages — persisted verbatim as auditable ground truth. */
+  diff_text?: string;
 };
 
 type ClassifyResult = {

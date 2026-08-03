@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ChangeStatus, type CrawlPageResult } from "#src/clients/firecrawl.ts";
-import { CONTEXT_EXCERPT_CHARS, crawlRawItem, NEW_PAGE_CHARS } from "#src/pipeline/crawl.ts";
+import { CONTEXT_EXCERPT_CHARS, crawlRawItem, DIFF_TEXT_MAX_CHARS, NEW_PAGE_CHARS } from "#src/pipeline/crawl.ts";
 import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
 
 const SOURCE: SourceRecord = {
@@ -59,6 +59,34 @@ describe("crawlRawItem", () => {
     expect(item?.published_at).toBe(NOW);
     expect(item?.relationship).toBe(Relationship.Displace);
     expect(item?.source).toBe("RingCentral pricing");
+  });
+
+  it("carries the raw diff on changed items as ground truth", () => {
+    const item = crawlRawItem({
+      source: SOURCE,
+      relationship: Relationship.Displace,
+      page: page({}),
+      nowIso: NOW
+    });
+    expect(item?.diff_text).toBe("-Standard $25\n+Standard $30");
+  });
+
+  it("caps the carried diff and leaves new pages without one", () => {
+    const long = "z".repeat(DIFF_TEXT_MAX_CHARS + 100);
+    const changed = crawlRawItem({
+      source: SOURCE,
+      relationship: Relationship.Displace,
+      page: page({ diffText: long }),
+      nowIso: NOW
+    });
+    expect(changed?.diff_text?.length).toBe(DIFF_TEXT_MAX_CHARS);
+    const fresh = crawlRawItem({
+      source: SOURCE,
+      relationship: Relationship.Displace,
+      page: page({ changeStatus: ChangeStatus.New }),
+      nowIso: NOW
+    });
+    expect(fresh?.diff_text).toBeUndefined();
   });
 
   it("uses the page markdown (truncated) for new pages and prefers the page title", () => {

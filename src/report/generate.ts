@@ -107,6 +107,8 @@ const askText = async (model: string, maxTokens: number, prompt: string, system?
 const clusterSummaryPrompt = (cluster: ReportItem[]): string =>
   [
     "Summarize this cluster of related intel items as ONE tight paragraph for an internal digest.",
+    "Use only numbers, prices, percentages, and dates that appear verbatim in the items below —",
+    "never derive, infer, or round new figures. When the items are vague, stay vague.",
     "End the paragraph with the canonical source links in parentheses, primary link first, each",
     "written as a markdown link [publisher name](url) — e.g. [FINRA.org](https://www.finra.org/...)",
     "— never a bare URL.",
@@ -183,7 +185,9 @@ const SYNTHESIS_SYSTEM = [
   "Aggie's voice: a sharp, well-read intel analyst who respects the reader's time — confident,",
   "warm, occasionally wry. The lead-in should hook; signals stay punchy; Details paragraphs stay",
   "plain and factual. Personality never bends facts: no invented details, no product hype, and",
-  "every link is preserved exactly as given, always as a markdown link [text](url), never a bare URL."
+  "every link is preserved exactly as given, always as a markdown link [text](url), never a bare URL.",
+  "Every number, price, percentage, or date you write must appear verbatim in the cluster summaries",
+  "— never compute, infer, or sharpen figures. A vaguer true claim beats a precise guess."
 ].join("\n");
 
 const synthesisPrompt = (vertical: Vertical, summaries: string[], previousBody: string): string =>

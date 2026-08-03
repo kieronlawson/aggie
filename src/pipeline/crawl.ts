@@ -4,6 +4,7 @@ import { type Relationship, type SourceRecord } from "#src/registry/types.ts";
 
 const CONTEXT_EXCERPT_CHARS = 4000;
 const NEW_PAGE_CHARS = 20000;
+const DIFF_TEXT_MAX_CHARS = 20000;
 
 type CrawlItemOpts = {
   source: SourceRecord;
@@ -38,8 +39,9 @@ const crawlRawItem = (opts: CrawlItemOpts): RawItem | null => {
     source: source.name,
     vertical: source.vertical,
     competitor: source.competitor,
-    relationship
+    relationship,
+    ...(changed ? { diff_text: page.diffText.slice(0, DIFF_TEXT_MAX_CHARS) } : {})
   };
 };
 
-export { CONTEXT_EXCERPT_CHARS, type CrawlItemOpts, crawlRawItem, NEW_PAGE_CHARS };
+export { CONTEXT_EXCERPT_CHARS, type CrawlItemOpts, crawlRawItem, DIFF_TEXT_MAX_CHARS, NEW_PAGE_CHARS };

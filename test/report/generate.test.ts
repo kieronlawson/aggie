@@ -65,6 +65,18 @@ describe("clusterSummaryPrompt", () => {
     expect(prompt).toContain("never a bare URL");
     expect(prompt).toContain("A FINRA thing happened.");
   });
+
+  it("forbids figures that are not verbatim in the items", () => {
+    const prompt = clusterSummaryPrompt([ITEM]);
+    expect(prompt).toContain("verbatim");
+    expect(prompt).toContain("stay vague");
+  });
+});
+
+describe("SYNTHESIS_SYSTEM figure grounding", () => {
+  it("forbids figures that are not verbatim in the cluster summaries", () => {
+    expect(SYNTHESIS_SYSTEM).toContain("verbatim in the cluster summaries");
+  });
 });
 
 describe("synthesisPrompt", () => {

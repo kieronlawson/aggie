@@ -154,6 +154,12 @@ describe("maintenance and SEC-filing rules in prompt", () => {
   });
 });
 
+describe("figure grounding in prompt", () => {
+  it("forbids summary figures that are not verbatim in the item", () => {
+    expect(SYSTEM_PROMPT).toContain("exactly as they appear");
+  });
+});
+
 describe("vertical and self-promo rules in prompt", () => {
   it("instructs subject-based vertical assignment", () => {
     expect(SYSTEM_PROMPT).toContain('vertical="none"');

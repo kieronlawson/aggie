@@ -27,6 +27,16 @@ describe("firecrawl batch change tracking", () => {
     expect(JSON.stringify(body["formats"])).toContain("git-diff");
   });
 
+  it("pins location and forces fresh scrapes so diffs compare like-for-like renders", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, id: "job-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await startChangeTrackingBatch(["https://a.example/pricing"]);
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body["location"]).toEqual({ country: "US", languages: ["en-US"] });
+    expect(body["maxAge"]).toBe(0);
+  });
+
   it("throws when the start response has no job id", async () => {
     vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ success: false })));

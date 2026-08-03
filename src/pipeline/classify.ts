@@ -37,7 +37,9 @@ const CLASSIFY_SCHEMA = {
 const SYSTEM_PROMPT =
   "You classify intel items for Spoke Phone, a cloud phone system vendor selling into regulated " +
   "verticals (finance, insurance, healthcare). Classify the item, extract a clean title, write a " +
-  "2-3 sentence summary, and list competitor/regulator entities mentioned. sentiment applies to " +
+  "2-3 sentence summary, and list competitor/regulator entities mentioned. In the summary, quote " +
+  "figures — prices, percentages, dates — exactly as they appear in the item; never infer, " +
+  "compute, or round new ones, and omit figures the item does not state. sentiment applies to " +
   "complaints only (mild/moderate/severe); use an empty string otherwise.\n\n" +
   "Set relevant=true ONLY when the item is either:\n" +
   "(a) regulatory/legal news that touches BUSINESS COMMUNICATIONS compliance — recordkeeping or " +

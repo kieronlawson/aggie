@@ -133,6 +133,14 @@ const requireJobId = (payload: { id?: string }): string => {
   return id;
 };
 
+/**
+ * Pinned rendering settings so week-over-week change tracking diffs
+ * like-for-like renders: a fixed US/en-US locale, and maxAge 0 so a diff is
+ * never computed against a cached page scraped with someone else's settings.
+ */
+const SCRAPE_LOCATION = { country: "US", languages: ["en-US"] };
+const SCRAPE_MAX_AGE_FRESH = 0;
+
 const startChangeTrackingBatch = async (urls: string[]): Promise<string> => {
   const response = await fetch(`${FIRECRAWL_API_BASE}/batch/scrape`, {
     method: "POST",
@@ -140,7 +148,9 @@ const startChangeTrackingBatch = async (urls: string[]): Promise<string> => {
     body: JSON.stringify({
       urls,
       formats: ["markdown", { type: "changeTracking", modes: ["git-diff"] }],
-      proxy: "auto"
+      proxy: "auto",
+      location: SCRAPE_LOCATION,
+      maxAge: SCRAPE_MAX_AGE_FRESH
     })
   });
   if (!response.ok) {

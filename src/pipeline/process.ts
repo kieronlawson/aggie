@@ -159,6 +159,8 @@ type StoreContext = {
   storyId: string;
 };
 
+const DIFF_TEXT_SCHEMA = { diff_text: { type: "string", filterable: false } };
+
 const storeItem = async (ctx: StoreContext): Promise<void> => {
   await upsertRows(ctx.namespace, [
     {
@@ -180,9 +182,10 @@ const storeItem = async (ctx: StoreContext): Promise<void> => {
       content_kind: ctx.classified.content_kind,
       merged_urls: [],
       content_hash: ctx.hash,
-      story_id: ctx.storyId
+      story_id: ctx.storyId,
+      diff_text: ctx.item.diff_text ?? ""
     }
-  ]);
+  ], DIFF_TEXT_SCHEMA);
 };
 
 /**

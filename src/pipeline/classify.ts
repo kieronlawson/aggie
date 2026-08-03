@@ -53,6 +53,16 @@ const SYSTEM_PROMPT =
   "content-marketing explainers or listicles. A law-firm or vendor post is relevant only when " +
   "its substance is a specific regulatory or legal development — a filing, ruling, enforcement " +
   "action, or rule change — reported as news, not the author's involvement or services.\n" +
+  "Set relevant=false for scheduled or planned maintenance notices — status-page announcements " +
+  "of upcoming or routine maintenance windows, even after the window has passed. Only unplanned " +
+  "incidents that actually occurred (outages, degradations, service disruptions) are relevant " +
+  "status news, and only those may be classified as outage — a maintenance notice is never an " +
+  "outage.\n" +
+  "An SEC filing is relevant only when it discloses substantive business news — earnings " +
+  "(10-K/10-Q, earnings 8-Ks), M&A, or another major strategic move. Set relevant=false for " +
+  "routine paperwork: ownership disclosures (Schedule 13D/13G and their amendments), insider " +
+  "Forms 3/4/5, registration statements, and 8-Ks whose only substance is officer/director " +
+  "changes or other administrative items.\n" +
   "Set relevant=false for everything else — e.g. general privacy/data-broker/breach laws, AI or " +
   "crypto regulation, ESG, employment law, tax, or securities-market news with no communications " +
   "angle.\n" +

@@ -53,6 +53,17 @@ Every change to a tuning threshold, with date and reason. Current values:
   tcpaworld.com supplied half of finance's 16 stories. Caps apply before cluster summarization,
   so trimmed items also cost no model spend.
 
+- 2026-08-03 — Tightened the relevance gate for competitor status and SEC sources:
+  scheduled/planned maintenance notices are relevant=false (only occurred, unplanned incidents
+  count, and only those may classify as `outage` — closing the 2026-07-29 amendment's
+  precondition for the alert branch), and SEC filings are relevant only when they carry
+  substantive business news (earnings, M&A, major strategic moves); ownership 13D/13G
+  amendments, insider forms, registration statements, and administrative 8-Ks (e.g. the Item
+  5.02 officer/director change) are relevant=false. Reason: Kieron flagged four noise stories in
+  the 2026-08-02 competitor digest — two Twilio scheduled-maintenance clusters, a RingCentral
+  13G-amendment cluster, and an 8x8 officer-change 8-K. Stored items re-judged via the
+  relevance backfill.
+
 - 2026-08-03 — Synthesis prompt edits: empty Continuing-stories sections are omitted instead of
   writing "None." (blocks.ts also skips "None."-bodied sections so old stored digests repost
   cleanly), and signal bullets must end with a real markdown link or a plain source name —

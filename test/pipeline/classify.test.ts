@@ -137,6 +137,19 @@ describe("vertical parsing", () => {
   });
 });
 
+describe("maintenance and SEC-filing rules in prompt", () => {
+  it("excludes scheduled maintenance and reserves outage for occurred incidents", () => {
+    expect(SYSTEM_PROMPT).toContain("scheduled or planned maintenance");
+    expect(SYSTEM_PROMPT).toContain("unplanned incidents");
+    expect(SYSTEM_PROMPT).toContain("never an outage");
+  });
+
+  it("limits SEC filings to substantive business news", () => {
+    expect(SYSTEM_PROMPT).toContain("Schedule 13D/13G");
+    expect(SYSTEM_PROMPT).toContain("officer/director changes");
+  });
+});
+
 describe("vertical and self-promo rules in prompt", () => {
   it("instructs subject-based vertical assignment", () => {
     expect(SYSTEM_PROMPT).toContain('vertical="none"');

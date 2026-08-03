@@ -133,6 +133,16 @@ describe("digestMessages edge cases", () => {
     expect((signal as { accessory?: unknown }).accessory).toBeUndefined();
   });
 
+  it("leaves no empty parens when a signal's citation was parenthesized", () => {
+    const body =
+      "Lead.\n\n## ⚡ Signals\n\n- 💼 **Sales:** cite the ruling → open the conversation. ([Mealey's](https://www.mealeys.com/article))";
+    const { card } = digestMessages(meta, body);
+    const signal = card.blocks.find((block) => blockText(block).includes("open the conversation"));
+    expect(signal).toBeDefined();
+    expect(blockText(signal as LooseBlock)).not.toContain("()");
+    expect((signal as { accessory: { url: string } }).accessory.url).toBe("https://www.mealeys.com/article");
+  });
+
   it("skips replies for sections whose body is empty or a bare None.", () => {
     const body = "Lead.\n\n## 🔁 Continuing stories\n\nNone.\n\n## 📚 Worth a read\n\n";
     const { replies } = digestMessages(meta, body);

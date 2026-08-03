@@ -76,6 +76,8 @@ const bulletLines = (body: string): string[] =>
   )(body);
 
 const TRAILING_SEPARATOR_PATTERN = /\s+[.—–-]?\s*$/u;
+/** Removing a parenthesized citation "([label](url))" must not leave "()" behind. */
+const EMPTY_PARENS_PATTERN = /\(\s*\)/gu;
 
 /** A signal's trailing story link becomes a URL button — no interactivity endpoint needed. */
 const signalBlock = (bullet: string): SlackBlock => {
@@ -85,6 +87,7 @@ const signalBlock = (bullet: string): SlackBlock => {
   }
   const text = bullet
     .replace(`[${link.label}](${link.url})`, "")
+    .replace(EMPTY_PARENS_PATTERN, "")
     .replace(TRAILING_SEPARATOR_PATTERN, "");
   return {
     ...section(toMrkdwn(text)),

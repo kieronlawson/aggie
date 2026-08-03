@@ -11,6 +11,7 @@ import { type CompetitorRecord, Relationship, SourceKind, type SourceRecord, Ver
 const ADDED_AT = "2026-07-17T00:00:00Z";
 const ADDED_AT_V2 = "2026-07-20T00:00:00Z";
 const ADDED_AT_PHASE4 = "2026-07-29T00:00:00Z";
+const ADDED_AT_V6 = "2026-08-03T00:00:00Z";
 
 const SEED_COMPETITORS: CompetitorRecord[] = [
   { name: "RingCentral", relationship: Relationship.Displace, aliases: ["RNG", "RingCentral MVP", "RingEX"], active: true },
@@ -188,6 +189,49 @@ const SEARCH_SOURCES: SourceRecord[] = [
     "hospital healthcare call center HIPAA compliance violation")
 ];
 
+const v6Source =
+  (vertical: Vertical) =>
+    (kind: SourceKind, name: string, url: string): SourceRecord => ({
+      kind,
+      url,
+      name,
+      vertical,
+      competitor: "",
+      active: true,
+      added_at: ADDED_AT_V6
+    });
+
+const financeSourceV6 = v6Source(Vertical.Finance);
+const insuranceSourceV6 = v6Source(Vertical.Insurance);
+const healthcareSourceV6 = v6Source(Vertical.Healthcare);
+
+/**
+ * Sources-v6 (2026-08-03): coverage gaps found reviewing the 2026-08-02 digests —
+ * finance had zero search sources (nothing on off-channel comms enforcement),
+ * insurance's own sources were all quiet, healthcare leaned on vendor SEO.
+ */
+const V6_SOURCES: SourceRecord[] = [
+  financeSourceV6(SourceKind.Search, "Search: SEC off-channel communications",
+    "SEC off-channel communications recordkeeping enforcement penalty"),
+  financeSourceV6(SourceKind.Search, "Search: FINRA e-comms supervision",
+    "FINRA electronic communications supervision recordkeeping fine"),
+  financeSourceV6(SourceKind.Search, "Search: broker-dealer messaging apps",
+    "broker-dealer WhatsApp text message recordkeeping violation"),
+  insuranceSourceV6(SourceKind.Feed, "JD Supra — Consumer Protection",
+    "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=ConsumerProtection&premium=1"),
+  insuranceSourceV6(SourceKind.Crawl, "Carlton Fields insights", "https://www.carltonfields.com/insights"),
+  insuranceSourceV6(SourceKind.Search, "Search: state DOI producer conduct",
+    "state insurance department enforcement action agent telemarketing"),
+  insuranceSourceV6(SourceKind.Search, "Search: insurance lead generation TCPA",
+    "insurance lead generation robocall consent settlement"),
+  healthcareSourceV6(SourceKind.Feed, "Healthcare Dive", "https://www.healthcaredive.com/feeds/news/"),
+  healthcareSourceV6(SourceKind.Feed, "JD Supra — Telehealth", "https://www.jdsupra.com/topics/telehealth_rss/"),
+  healthcareSourceV6(SourceKind.Search, "Search: OCR telehealth communications",
+    "HHS OCR HIPAA settlement telehealth patient communications"),
+  healthcareSourceV6(SourceKind.Search, "Search: patient texting TCPA",
+    "hospital healthcare appointment reminder text TCPA lawsuit")
+];
+
 const SEED_SOURCES: SourceRecord[] = [
   ...REGULATOR_FEEDS,
   ...TRADE_PRESS_FEEDS,
@@ -197,7 +241,8 @@ const SEED_SOURCES: SourceRecord[] = [
   ...CRAWL_TARGETS,
   ...INSURANCE_SOURCES,
   ...HEALTHCARE_SOURCES,
-  ...SEARCH_SOURCES
+  ...SEARCH_SOURCES,
+  ...V6_SOURCES
 ];
 
 const SEED_NOTES: string[] = [
@@ -238,7 +283,16 @@ const SEED_NOTES: string[] = [
   "Sources-v5 (2026-07-29): six Firecrawl news-search queries added as kind=search rows (url " +
     "field holds the query) after the first insurance/healthcare cycle showed feeds alone " +
     "under-cover those verticals. Weekly in W2, 2 credits per query, classify on title+snippet. " +
-    "See docs/sources-v5-search-queries.md."
+    "See docs/sources-v5-search-queries.md.",
+  "Sources-v6 (2026-08-03): finance gets its first search queries (SEC/FINRA off-channel comms " +
+    "enforcement — the most Spoke-relevant finance topic and absent from the 2026-08-02 digest). " +
+    "JD Supra Consumer Protection (200/RSS on seed day) reverses the phase-4 skip: insurance " +
+    "lead-gen TCPA alerts concentrate there, and the per-domain report cap plus the tightened " +
+    "relevance gate now carry the noise it brings. Carlton Fields insights is Cloudflare-403 to " +
+    "curl but expected through Firecrawl (same precedent as 8x8 pricing). Healthcare Dive and " +
+    "JD Supra Telehealth (both 200/RSS on seed day) end the phase-4 deferral — the healthcare " +
+    "digest was thin on quality, not volume. Fierce Healthcare skipped (overlaps Dive). All " +
+    "sharper v6 queries are additions; the v5 rows stay active."
 ];
 
 export { SEED_COMPETITORS, SEED_NOTES, SEED_SOURCES };

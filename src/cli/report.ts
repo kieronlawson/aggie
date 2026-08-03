@@ -70,26 +70,34 @@ const TRUE_FLAG = "true";
 type ReportVerticalOpts = {
   vertical: Vertical;
   force: boolean;
+  staging: boolean;
   reportDate: string;
   sources: SourceRecord[];
 };
 
+type RepostOpts = {
+  vertical: Vertical;
+  reportDate: string;
+  stored: StoredReport;
+  channel: SlackChannel;
+};
+
 /** Re-delivers the digest exactly as first generated — a force re-run never rewrites content. */
-const repostStored = async (vertical: Vertical, reportDate: string, stored: StoredReport): Promise<void> => {
+const repostStored = async ({ vertical, reportDate, stored, channel }: RepostOpts): Promise<void> => {
   const messages = digestMessages({ vertical, reportDate, counts: stored.counts }, stored.body);
-  const channel = channelFor(vertical);
   await deliverToSlack(channel, messages);
   console.log(`Stored digest for ${vertical} (${reportDate}) reposted to ${channel} — not regenerated.`);
 };
 
-const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVerticalOpts): Promise<void> => {
+const reportVertical = async ({ vertical, force, staging, reportDate, sources }: ReportVerticalOpts): Promise<void> => {
+  const channel = staging ? SlackChannel.IntelStaging : channelFor(vertical);
   const stored = await storedReport(vertical, reportDate);
   if (stored !== undefined && !force) {
     console.log(`Digest for ${vertical} on ${reportDate} already delivered — skipping (idempotent re-run).`);
     return;
   }
   if (stored !== undefined) {
-    await repostStored(vertical, reportDate, stored);
+    await repostStored({ vertical, reportDate, stored, channel });
     return;
   }
   const generated = await generateDigestBody(vertical);
@@ -106,8 +114,11 @@ const reportVertical = async ({ vertical, force, reportDate, sources }: ReportVe
   const digest = appendStaticSections(generated.body, footerNotes);
   const counts = { items: generated.items, clusters: generated.clusters };
   const messages = digestMessages({ vertical, reportDate, counts }, digest);
-  const channel = channelFor(vertical);
   await deliverToSlack(channel, messages);
+  if (staging) {
+    console.log(`Digest for ${vertical} rehearsed to ${channel} (${reportDate}) — not stored.`);
+    return;
+  }
   await upsertReport({ vertical, reportDate, body: digest, items: generated.items, clusters: generated.clusters });
   console.log(`Digest for ${vertical} posted to ${channel} (threaded) and upserted (${reportDate}).`);
 };
@@ -124,9 +135,12 @@ const reportVerticalSafely = async (opts: ReportVerticalOpts): Promise<string> =
 };
 
 const main = async (): Promise<void> => {
-  const { values } = parseArgs({ options: { vertical: { type: "string" }, force: { type: "string" } } });
+  const { values } = parseArgs({
+    options: { vertical: { type: "string" }, force: { type: "string" }, staging: { type: "string" } }
+  });
   const requested = values.vertical ?? "";
   const force = values.force === TRUE_FLAG;
+  const staging = values.staging === TRUE_FLAG;
   const reportDate = new Date().toISOString().slice(0, DATE_LENGTH);
   const feedSources = await loadActiveSources(SourceKind.Feed);
   const crawlSources = await loadActiveSources(SourceKind.Crawl);
@@ -134,7 +148,7 @@ const main = async (): Promise<void> => {
   const sources = [...feedSources, ...crawlSources, ...searchSources];
   const verticals = requested.length === 0 ? sourcedVerticals(sources) : [parseVertical(requested)];
   const outcomes = await sequentially(verticals, (vertical) =>
-    reportVerticalSafely({ vertical, force, reportDate, sources })
+    reportVerticalSafely({ vertical, force, staging, reportDate, sources })
   );
   const failures = R.reject(R.isEmpty, outcomes);
   if (failures.length > 0) {

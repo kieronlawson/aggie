@@ -43,6 +43,12 @@ npm run verify                        # phase-0 style health check of all five s
 
 Every workflow is exactly one of these commands — behaviour is identical locally and in Actions.
 
+## Rehearsing a digest in staging
+
+Actions → **w3-report** → Run workflow with `staging: true`. The digest is generated fresh,
+delivered to `#intel-staging` instead of the promoted channel, and **not stored** — so the next
+scheduled Sunday run still generates and delivers normally.
+
 ## Re-running a workflow
 
 Actions → pick the workflow → Run workflow. All entrypoints are idempotent: ingest skips seen

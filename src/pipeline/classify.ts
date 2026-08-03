@@ -1,7 +1,14 @@
 import * as R from "ramda";
 
 import { createAnthropic, HAIKU_MODEL, TEXT_BLOCK_TYPE } from "#src/clients/anthropic.ts";
-import { Classification, type ClassifyResult, ContentKind, type RawItem, Sentiment } from "#src/pipeline/types.ts";
+import {
+  Classification,
+  type ClassifyResult,
+  ContentKind,
+  ItemVertical,
+  type RawItem,
+  Sentiment
+} from "#src/pipeline/types.ts";
 
 const CLASSIFY_MAX_TOKENS = 1024;
 const ERROR_SNIPPET_LENGTH = 200;
@@ -9,6 +16,7 @@ const ERROR_SNIPPET_LENGTH = 200;
 const CLASSIFICATIONS: string[] = Object.values(Classification);
 const SENTIMENTS: string[] = Object.values(Sentiment);
 const CONTENT_KINDS: string[] = Object.values(ContentKind);
+const ITEM_VERTICALS: string[] = Object.values(ItemVertical);
 
 const CLASSIFY_SCHEMA = {
   type: "object",
@@ -19,9 +27,10 @@ const CLASSIFY_SCHEMA = {
     summary: { type: "string", description: "2-3 sentence summary" },
     entities: { type: "array", items: { type: "string" } },
     relevant: { type: "boolean" },
-    content_kind: { type: "string", enum: CONTENT_KINDS }
+    content_kind: { type: "string", enum: CONTENT_KINDS },
+    vertical: { type: "string", enum: ITEM_VERTICALS }
   },
-  required: ["classification", "sentiment", "title", "summary", "entities", "relevant", "content_kind"],
+  required: ["classification", "sentiment", "title", "summary", "entities", "relevant", "content_kind", "vertical"],
   additionalProperties: false
 } as const;
 
@@ -38,6 +47,12 @@ const SYSTEM_PROMPT =
   "(b) intelligence about these companies: RingCentral, 8x8, Aircall, UJET, Twilio/Twilio Flex, " +
   "Theta Lake, Smarsh — products, pricing, outages, complaints, hiring, partnerships, M&A, or " +
   "their SEC filings.\n" +
+  "Set relevant=false for self-promotional and marketing content even when its topic matches " +
+  "(a): law-firm case-win or client-victory announcements, firm news (awards, hires, " +
+  "podcast/webinar/event or studio announcements), vendor product marketing, and " +
+  "content-marketing explainers or listicles. A law-firm or vendor post is relevant only when " +
+  "its substance is a specific regulatory or legal development — a filing, ruling, enforcement " +
+  "action, or rule change — reported as news, not the author's involvement or services.\n" +
   "Set relevant=false for everything else — e.g. general privacy/data-broker/breach laws, AI or " +
   "crypto regulation, ESG, employment law, tax, or securities-market news with no communications " +
   "angle.\n" +
@@ -50,11 +65,20 @@ const SYSTEM_PROMPT =
   "proposal or adoption, court decision, filing, announcement, incident, or personnel change. " +
   "Set content_kind=evergreen for undated guidance, how-tos, best-practice explainers, webinars, " +
   "or vendor thought leadership — content that would read the same whichever week it was " +
-  "published. When genuinely unsure, prefer news.";
+  "published. When genuinely unsure, prefer news.\n\n" +
+  "Set vertical to the single best-fit vertical for the story's SUBJECT: \"finance\" (banks, " +
+  "broker-dealers, investment advisers, lenders/mortgage, debt collection, " +
+  "SEC/FINRA/CFTC/CFPB/OCC matters), \"insurance\" (carriers, agencies, producers, lead " +
+  "generators, NAIC or state insurance department matters), \"healthcare\" (providers, payers, " +
+  "telehealth, pharmacies, HIPAA/HHS/OCR matters). Judge by who the story is about — the " +
+  "regulated entity or regulator — never by where it was published or which query found it. Set " +
+  "vertical=\"none\" when the story has no specific tie to one of the three — e.g. a generic " +
+  "TCPA ruling, an FCC robocall rule, cross-industry recordkeeping guidance, or " +
+  "competitor/vendor news.";
 
 const buildClassifyPrompt = (item: RawItem): string =>
   [
-    `Vertical: ${item.vertical}`,
+    `Found via: ${item.vertical} source (provenance only — may not match the story's subject)`,
     `Relationship: ${item.relationship}`,
     item.competitor.length > 0 ? `Competitor: ${item.competitor}` : "",
     `Source URL: ${item.url}`,
@@ -85,7 +109,10 @@ const parseClassifyResult = (text: string): ClassifyResult => {
       entities: asStringArray(parsed["entities"]),
       relevant: typeof parsed["relevant"] === "boolean" ? parsed["relevant"] : true,
       content_kind:
-        parsed["content_kind"] === ContentKind.Evergreen ? ContentKind.Evergreen : ContentKind.News
+        parsed["content_kind"] === ContentKind.Evergreen ? ContentKind.Evergreen : ContentKind.News,
+      vertical: R.includes(parsed["vertical"], ITEM_VERTICALS)
+        ? (parsed["vertical"] as ItemVertical)
+        : ItemVertical.None
     };
   } catch {
     throw new Error(`Unparseable classification response: ${text.slice(0, ERROR_SNIPPET_LENGTH)}`);

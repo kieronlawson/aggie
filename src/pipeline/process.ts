@@ -12,10 +12,11 @@ import {
   upsertRows
 } from "#src/clients/turbopuffer.ts";
 import { embed } from "#src/clients/voyage.ts";
+import { sequentially } from "#src/lib/async.ts";
 import { type CanonicalCandidate, selectCanonical } from "#src/pipeline/canonical.ts";
 import { classifyItem } from "#src/pipeline/classify.ts";
 import { contentHash, normalizeContent } from "#src/pipeline/normalize.ts";
-import { type ClassifyResult, DedupeVerdict, type RawItem } from "#src/pipeline/types.ts";
+import { type ClassifyResult, DedupeVerdict, ItemVertical, type RawItem } from "#src/pipeline/types.ts";
 import { parseVerdict } from "#src/pipeline/verdict.ts";
 import { Vertical } from "#src/registry/types.ts";
 
@@ -56,6 +57,46 @@ const ITEMS_NAMESPACE_BY_VERTICAL: Record<Vertical, TpufNamespace> = {
 };
 
 const itemsNamespaceFor = (vertical: Vertical): TpufNamespace => ITEMS_NAMESPACE_BY_VERTICAL[vertical];
+
+const VERTICAL_BY_ITEM_VERTICAL: Record<Exclude<ItemVertical, ItemVertical.None>, Vertical> = {
+  [ItemVertical.Finance]: Vertical.Finance,
+  [ItemVertical.Insurance]: Vertical.Insurance,
+  [ItemVertical.Healthcare]: Vertical.Healthcare
+};
+
+/**
+ * Where an item lives: competitor-sourced items always stay competitor; a
+ * classified vertical overrides the source's (fixes misfiled stories); a
+ * generic story (none) stays with the source that found it — 2026-08-03
+ * decision, see docs/tuning-log.md.
+ */
+const routeVertical = (source: Vertical, classified: ItemVertical): Vertical => {
+  if (source === Vertical.Competitor) {
+    return Vertical.Competitor;
+  }
+  if (classified === ItemVertical.None) {
+    return source;
+  }
+  return VERTICAL_BY_ITEM_VERTICAL[classified];
+};
+
+const SEEN_QUERY_CHUNK = 200;
+
+/**
+ * URLs already stored in ANY item namespace. Routing can place an item under
+ * a different vertical than the source that fetched it, so a per-vertical
+ * seen-check would re-ingest such items forever.
+ */
+const seenItemUrls = async (urls: string[]): Promise<Set<string>> => {
+  if (urls.length === 0) {
+    return new Set();
+  }
+  const pairs = R.xprod(Object.values(ITEMS_NAMESPACE_BY_VERTICAL), R.splitEvery(SEEN_QUERY_CHUNK, urls));
+  const rowChunks = await sequentially(pairs, ([namespace, chunk]) =>
+    queryRows({ namespace, filters: ["url", "In", chunk], topK: chunk.length, includeAttributes: ["url"] })
+  );
+  return new Set(R.map((row) => String(row["url"]), R.flatten(rowChunks)));
+};
 
 const itemId = (url: string): string =>
   `item:${createHash("sha256").update(url).digest("hex").slice(0, ITEM_ID_HASH_LENGTH)}`;
@@ -174,11 +215,15 @@ const layer2StoryId = async (
 };
 
 /**
- * The P pipeline for one item: normalize → hash → layer-1 exact dedupe →
- * classify → embed → layer-2 neighbour arbitration → layer-3 canonical merge
- * or upsert. Assumes the caller already filtered seen URLs.
+ * The P pipeline for one item: classify → route vertical → normalize → hash →
+ * layer-1 exact dedupe → embed → layer-2 neighbour arbitration → layer-3
+ * canonical merge or upsert. Classification runs first because the routed
+ * vertical decides the namespace every later stage operates in. Assumes the
+ * caller already filtered seen URLs.
  */
-const processRawItem = async (item: RawItem): Promise<ProcessOutcome> => {
+const processRawItem = async (rawItem: RawItem): Promise<ProcessOutcome> => {
+  const classified = await classifyItem(rawItem);
+  const item: RawItem = { ...rawItem, vertical: routeVertical(rawItem.vertical, classified.vertical) };
   const namespace = itemsNamespaceFor(item.vertical);
   const hash = contentHash(normalizeContent(`${item.title}\n${item.content}`));
   const hashMatches = await queryRows({
@@ -191,7 +236,6 @@ const processRawItem = async (item: RawItem): Promise<ProcessOutcome> => {
     await mergeIntoExisting(namespace, exact, item);
     return ProcessOutcome.Merged;
   }
-  const classified = await classifyItem(item);
   const vectors = await embed([`${classified.title}\n${classified.summary}`], "document");
   const vector = vectors[0];
   if (vector === undefined) {
@@ -217,5 +261,7 @@ export {
   layer2StoryId,
   ORIGINATING_DOMAINS,
   ProcessOutcome,
-  processRawItem
+  processRawItem,
+  routeVertical,
+  seenItemUrls
 };

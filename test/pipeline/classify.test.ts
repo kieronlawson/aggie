@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseClassifyResult, SYSTEM_PROMPT } from "#src/pipeline/classify.ts";
-import { Classification, ContentKind, Sentiment } from "#src/pipeline/types.ts";
+import { Classification, ContentKind, ItemVertical, Sentiment } from "#src/pipeline/types.ts";
 
 describe("parseClassifyResult", () => {
   it("parses a valid structured response", () => {
@@ -113,5 +113,38 @@ describe("content_kind in prompt", () => {
     expect(SYSTEM_PROMPT).toContain("content_kind=news");
     expect(SYSTEM_PROMPT).toContain("content_kind=evergreen");
     expect(SYSTEM_PROMPT).toContain("dated event");
+  });
+});
+
+describe("vertical parsing", () => {
+  const base = {
+    classification: "enforcement_action",
+    sentiment: "",
+    title: "T",
+    summary: "S",
+    entities: [],
+    relevant: true,
+    content_kind: "news"
+  };
+
+  it.each(Object.values(ItemVertical))("passes %s through", (vertical) => {
+    expect(parseClassifyResult(JSON.stringify({ ...base, vertical })).vertical).toBe(vertical);
+  });
+
+  it("defaults missing or unknown vertical to none", () => {
+    expect(parseClassifyResult(JSON.stringify(base)).vertical).toBe(ItemVertical.None);
+    expect(parseClassifyResult(JSON.stringify({ ...base, vertical: "telecom" })).vertical).toBe(ItemVertical.None);
+  });
+});
+
+describe("vertical and self-promo rules in prompt", () => {
+  it("instructs subject-based vertical assignment", () => {
+    expect(SYSTEM_PROMPT).toContain('vertical="none"');
+    expect(SYSTEM_PROMPT).toContain("never by where it was published");
+  });
+
+  it("excludes self-promotional content", () => {
+    expect(SYSTEM_PROMPT).toContain("self-promotional");
+    expect(SYSTEM_PROMPT).toContain("case-win");
   });
 });

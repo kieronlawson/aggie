@@ -7,7 +7,7 @@ import { postMessage, SlackChannel } from "#src/clients/slack.ts";
 import { patchRows, queryRows, type TpufResultRow } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { classifyItem } from "#src/pipeline/classify.ts";
-import { itemsNamespaceFor, ProcessOutcome, processRawItem } from "#src/pipeline/process.ts";
+import { itemsNamespaceFor, ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
 import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
@@ -15,7 +15,6 @@ import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/regi
 /** Items older than this are ignored; the first run doubles as the backfill. */
 const INGEST_MAX_AGE_DAYS = 14;
 const DAY_MS = 86_400_000;
-const SEEN_QUERY_CHUNK = 200;
 
 type SourceResult = {
   source: string;
@@ -24,20 +23,6 @@ type SourceResult = {
   stored: number;
   merged: number;
   error: string;
-};
-
-const seenUrls = async (source: SourceRecord, urls: string[]): Promise<Set<string>> => {
-  const namespace = itemsNamespaceFor(source.vertical);
-  const chunks = R.splitEvery(SEEN_QUERY_CHUNK, urls);
-  const rowChunks = await sequentially(chunks, (chunk) =>
-    queryRows({
-      namespace,
-      filters: ["url", "In", chunk],
-      topK: chunk.length,
-      includeAttributes: ["url"]
-    })
-  );
-  return new Set(R.map((row) => String(row["url"]), R.flatten(rowChunks)));
 };
 
 const freshItems = (items: RawItem[], nowMs: number): RawItem[] => {
@@ -61,7 +46,7 @@ const ingestSource = async (
     const nowIso = new Date().toISOString();
     const mapped = R.map((entry) => mapEntryToRawItem(entry, source, relationship, nowIso), entries);
     const fresh = freshItems(mapped, Date.now());
-    const seen = await seenUrls(source, R.map((item: RawItem) => item.url, fresh));
+    const seen = await seenItemUrls(R.map((item: RawItem) => item.url, fresh));
     const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
     const outcomes = await sequentially(unseen, processRawItem);
     return {

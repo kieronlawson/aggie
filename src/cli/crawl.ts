@@ -14,18 +14,16 @@ import {
   startChangeTrackingBatch
 } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
-import { queryRows } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { crawlRawItem } from "#src/pipeline/crawl.ts";
-import { itemsNamespaceFor, ProcessOutcome, processRawItem } from "#src/pipeline/process.ts";
+import { ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { SearchDrop, searchRawItem } from "#src/pipeline/search.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
-import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
+import { Relationship, SourceKind, type SourceRecord } from "#src/registry/types.ts";
 
 const POLL_INTERVAL_MS = 15_000;
 const POLL_TIMEOUT_MS = 900_000;
-const SEEN_QUERY_CHUNK = 200;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -92,28 +90,10 @@ const buildItemsWithMeta = (
   return R.filter(isItemWithMeta, attempted);
 };
 
-const seenUrlsForVertical = async (vertical: Vertical, urls: string[]): Promise<Set<string>> => {
-  if (urls.length === 0) {
-    return new Set();
-  }
-  const namespace = itemsNamespaceFor(vertical);
-  const chunks = R.splitEvery(SEEN_QUERY_CHUNK, urls);
-  const rowChunks = await sequentially(chunks, (chunk) =>
-    queryRows({ namespace, filters: ["url", "In", chunk], topK: chunk.length, includeAttributes: ["url"] })
-  );
-  return new Set(R.map((row) => String(row["url"]), R.flatten(rowChunks)));
-};
-
 /** Changed pages always process; new pages are dropped if the URL is already stored. */
 const dropSeenNewItems = async (newItems: ItemWithMeta[]): Promise<{ kept: ItemWithMeta[]; alreadySeen: number }> => {
-  const grouped = R.groupBy((meta: ItemWithMeta) => meta.item.vertical, newItems);
-  const verticals = Object.keys(grouped) as Vertical[];
-  const perVertical = await sequentially(verticals, async (vertical) => {
-    const metas = grouped[vertical] ?? [];
-    const seen = await seenUrlsForVertical(vertical, R.map((meta: ItemWithMeta) => meta.item.url, metas));
-    return R.reject((meta: ItemWithMeta) => seen.has(meta.item.url), metas);
-  });
-  const kept = R.flatten(perVertical);
+  const seen = await seenItemUrls(R.map((meta: ItemWithMeta) => meta.item.url, newItems));
+  const kept = R.reject((meta: ItemWithMeta) => seen.has(meta.item.url), newItems);
   return { kept, alreadySeen: newItems.length - kept.length };
 };
 
@@ -244,7 +224,7 @@ const searchSource = async (source: SourceRecord, nowMs: number): Promise<Search
     const mapped = R.map((result) => searchRawItem({ source, result, nowMs }), results);
     const drops = R.countBy(String, R.reject(isRawItem, mapped));
     const fresh = R.uniqBy((item: RawItem) => item.url, R.filter(isRawItem, mapped));
-    const seen = await seenUrlsForVertical(source.vertical, R.map((item: RawItem) => item.url, fresh));
+    const seen = await seenItemUrls(R.map((item: RawItem) => item.url, fresh));
     const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
     const outcomes = await sequentially(unseen, processRawItem);
     return {

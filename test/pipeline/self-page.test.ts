@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { layer2StoryId } from "#src/pipeline/process.ts";
-import { Classification, ContentKind, type RawItem } from "#src/pipeline/types.ts";
+import { Classification, ContentKind, ItemVertical, type RawItem } from "#src/pipeline/types.ts";
 import { Relationship, Vertical } from "#src/registry/types.ts";
 
 const ITEM: RawItem = {
@@ -22,7 +22,8 @@ const CLASSIFIED = {
   summary: "Pricing changed.",
   entities: [],
   relevant: true,
-  content_kind: ContentKind.News
+  content_kind: ContentKind.News,
+  vertical: ItemVertical.None
 };
 
 describe("layer2StoryId self-page continuity", () => {

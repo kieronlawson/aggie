@@ -33,6 +33,14 @@ enum ContentKind {
   Evergreen = "evergreen"
 }
 
+/** The story's best-fit vertical as judged by classification — "none" = no specific tie. */
+enum ItemVertical {
+  Finance = "finance",
+  Insurance = "insurance",
+  Healthcare = "healthcare",
+  None = "none"
+}
+
 /** An item as fetched from a source, before classification. */
 type RawItem = {
   url: string;
@@ -55,6 +63,8 @@ type ClassifyResult = {
   relevant: boolean;
   /** Evergreen = undated guidance/thought-leadership; excluded from digest stories. */
   content_kind: ContentKind;
+  /** Judged by the story's subject, not its source — used to route misfiled items. */
+  vertical: ItemVertical;
 };
 
 /** Fully processed item, matching the TurboPuffer item-namespace attributes. */
@@ -65,4 +75,13 @@ type ProcessedItem = RawItem & ClassifyResult & {
   published_at_ms: number;
 };
 
-export { Classification, type ClassifyResult, ContentKind, DedupeVerdict, type ProcessedItem, type RawItem, Sentiment };
+export {
+  Classification,
+  type ClassifyResult,
+  ContentKind,
+  DedupeVerdict,
+  ItemVertical,
+  type ProcessedItem,
+  type RawItem,
+  Sentiment
+};

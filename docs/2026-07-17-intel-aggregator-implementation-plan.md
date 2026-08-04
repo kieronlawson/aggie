@@ -42,6 +42,18 @@ feedless or WAF-gated). Search queries run in the Saturday W2 job at 2 credits p
 P pipeline. Kieron chose Firecrawl search over Google News RSS (redirect-link URLs would break
 canonical linking and dedupe; Firecrawl is already in the approved service set). Queries are
 documented in `docs/sources-v5-search-queries.md`.
+**Amendment (2026-08-05, Kieron):** a new branch — **prospect scanning from job postings** —
+is specced in `docs/2026-08-05-prospect-scanning-spec.md` and added as §10, deliberately
+unscheduled ([K] decides when it builds). It supersedes the *purpose* of the deferred §4
+task 1: instead of polling known competitors' ATS boards for `hiring_signal` digest items,
+it discovers prospect companies across the US job market from hiring patterns (e.g. a wealth
+advisory firm hiring remote advisors and compliance officers simultaneously) and alerts
+sales immediately. Decisions: data source is **TheirStack** (a new approved service for this
+branch only, amending the spec's service cap; secret `THEIRSTACK_API_KEY`); alerts go to a
+new **`#intel-prospects`** channel after their quality gate (staging until then); US only;
+current target verticals with per-vertical structure for later additions. The seeded
+`job_board` registry rows and the `hiring_signal` classification are unchanged and remain
+unused.
 **Companion document:** `2026-07-17-intel-aggregator-spec.md`
 **Build mode:** Autonomous (Claude builds; Kieron provisions accounts and reviews at phase gates)
 
@@ -155,6 +167,39 @@ Run the system untouched for four weeks (per spec: stop and observe). The only w
 - `docs/tuning-log.md` — every threshold change with date and reason (dedupe candidate threshold starts at 0.90; alert sentiment threshold starts at `moderate`).
 - `docs/sources-v1.md` — the reviewed initial registry, kept current by W0 exports at each phase gate.
 
-## 9. Total Kieron time budget
+## 9. Total Kieron time budget (phases 0–5)
 
 Provisioning (section 1): roughly 45 minutes. Phase gates: four reviews of ~15 minutes each, spread across the build. Everything else is autonomous.
+
+## 10. Prospect scanning from job postings — specced 2026-08-05, unscheduled
+
+Full design in `docs/2026-08-05-prospect-scanning-spec.md`. A new branch, not an intel phase:
+it detects prospect companies from hiring patterns (customer-facing roles + compliance roles
+concurrently at the same US company in a target vertical) and alerts sales per company. It
+does not touch pipeline P, the digests, or the existing alert branch. [K] decides when this
+builds; nothing below starts until then.
+
+**Tasks (when scheduled)**
+1. **[K]** Provision a TheirStack account; set `THEIRSTACK_API_KEY` as a repo secret and add
+   it to `.env.example`. Free tier (200 job records/month) covers the pilot.
+2. **[K]** Rubric review: per-vertical role lists, the ICP employee-count band, strengtheners
+   (spec's Signal model section). ~15 minutes.
+3. TheirStack client under `src/clients/`; per-vertical query constants and rubric prompts
+   under `src/prospects/` (queries in code, not registry — resolved in the spec).
+4. Prospect pipeline: fetch → group by company domain → exclude competitors (registry
+   aliases) and cooldown companies → one Claude scoring call per company with both rubric
+   sides present → strong matches alert; every considered company upserts to a new
+   `prospects` TurboPuffer namespace (schema in the spec; 90-day alert cooldown, changes
+   logged in `docs/tuning-log.md`).
+5. `prospects` CLI entrypoint behind `w4-prospects.yml` (weekly cron + `workflow_dispatch`,
+   thin shell); failures post to Slack with context; re-runs idempotent via the namespace.
+6. Fixtures and tests: a both-sides posting set → strong with rationale; one-sided set →
+   recorded not scored; competitor-domain set → excluded; second run inside cooldown → no
+   re-alert.
+
+**Acceptance test:** several weeks of scheduled scans on the free tier; at least one prospect
+alert fires end-to-end into `#intel-staging` (seed a fixture company if the market is quiet),
+and a re-run of the same window produces no duplicate alert.
+**Gate [K]:** pilot review — does the co-occurrence pattern surface in TheirStack's data at
+acceptable quality? If yes: decide on the paid tier, tune score threshold/cooldown, and
+promote alerts to `#intel-prospects`. If no: stop at zero cost. ~15 minutes.

@@ -24,6 +24,9 @@ of truth is:
 - `docs/2026-07-17-intel-aggregator-implementation-plan.md` — build phases 0–5, each with tasks,
   deliverables, and an acceptance test that must pass before the next phase starts. Tasks marked
   **[K]** need Kieron; everything else is autonomous.
+- `docs/2026-08-05-prospect-scanning-spec.md` — prospect scanning from job postings (TheirStack →
+  company-level hiring-pattern alerts to `#intel-prospects`). Specced only — build is unscheduled
+  (plan §10); do not start it until Kieron schedules it.
 
 Read both documents before doing any build work. Do not skip ahead of the current phase or start
 a phase before the previous gate has passed.

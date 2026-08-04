@@ -174,28 +174,33 @@ Provisioning (section 1): roughly 45 minutes. Phase gates: four reviews of ~15 m
 ## 10. Prospect scanning from job postings — specced 2026-08-05, unscheduled
 
 Full design in `docs/2026-08-05-prospect-scanning-spec.md`. A new branch, not an intel phase:
-it detects prospect companies from hiring patterns (customer-facing roles + compliance roles
-concurrently at the same US company in a target vertical) and alerts sales per company. It
-does not touch pipeline P, the digests, or the existing alert branch. [K] decides when this
-builds; nothing below starts until then.
+it detects prospect companies from hiring patterns — remote/hybrid revenue-generating
+customer-facing roles at a 500+-employee US company in a target vertical, with an active or
+growing compliance org (evidenced by current or trailing-18-month compliance postings) — and
+alerts sales per company. It does not touch pipeline P, the digests, or the existing alert
+branch. [K] decides when this builds; nothing below starts until then.
 
 **Tasks (when scheduled)**
 1. **[K]** Provision a TheirStack account; set `THEIRSTACK_API_KEY` as a repo secret and add
    it to `.env.example`. Free tier (200 job records/month) covers the pilot.
-2. **[K]** Rubric review: per-vertical role lists, the ICP employee-count band, strengtheners
+2. **[K]** Rubric review: per-vertical role lists (healthcare's "revenue-generating" reading
+   especially), the 500-employee floor, the 18-month active-compliance window, strengtheners
    (spec's Signal model section). ~15 minutes.
 3. TheirStack client under `src/clients/`; per-vertical query constants and rubric prompts
    under `src/prospects/` (queries in code, not registry — resolved in the spec).
-4. Prospect pipeline: fetch → group by company domain → exclude competitors (registry
-   aliases) and cooldown companies → one Claude scoring call per company with both rubric
-   sides present → strong matches alert; every considered company upserts to a new
-   `prospects` TurboPuffer namespace (schema in the spec; 90-day alert cooldown, changes
-   logged in `docs/tuning-log.md`).
+4. Prospect pipeline: fetch current-window revenue-role (remote/hybrid, ≥500 employees) and
+   compliance-role postings → group by company domain → exclude competitors (registry
+   aliases) and cooldown companies → establish compliance evidence per revenue-match company
+   (current postings = growing; cached company-filtered historical query = active) → one
+   Claude scoring call per company with evidence → strong matches alert; every considered
+   company upserts to a new `prospects` TurboPuffer namespace (schema in the spec; 90-day
+   alert cooldown; threshold changes logged in `docs/tuning-log.md`).
 5. `prospects` CLI entrypoint behind `w4-prospects.yml` (weekly cron + `workflow_dispatch`,
    thin shell); failures post to Slack with context; re-runs idempotent via the namespace.
-6. Fixtures and tests: a both-sides posting set → strong with rationale; one-sided set →
-   recorded not scored; competitor-domain set → excluded; second run inside cooldown → no
-   re-alert.
+6. Fixtures and tests: revenue roles + growing compliance → strong with rationale; revenue
+   roles + no compliance evidence → recorded not scored; historical-hit company → active,
+   scored, and the check cached (no second query); competitor-domain set → excluded; second
+   run inside cooldown → no re-alert.
 
 **Acceptance test:** several weeks of scheduled scans on the free tier; at least one prospect
 alert fires end-to-end into `#intel-staging` (seed a fixture company if the market is quiet),

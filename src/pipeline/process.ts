@@ -13,6 +13,7 @@ import {
 } from "#src/clients/turbopuffer.ts";
 import { embed } from "#src/clients/voyage.ts";
 import { sequentially } from "#src/lib/async.ts";
+import { alertMessage, postAlert } from "#src/pipeline/alert.ts";
 import { type CanonicalCandidate, selectCanonical } from "#src/pipeline/canonical.ts";
 import { classifyItem } from "#src/pipeline/classify.ts";
 import { contentHash, normalizeContent } from "#src/pipeline/normalize.ts";
@@ -218,9 +219,25 @@ const layer2StoryId = async (
 };
 
 /**
+ * Alerts fire once per story: only a fresh item (empty story_id) qualifies,
+ * so merges, same-story follow-ups, and re-runs never re-alert.
+ */
+const maybeAlert = async (item: RawItem, classified: ClassifyResult, storyId: string): Promise<void> => {
+  if (storyId.length > 0) {
+    return;
+  }
+  const message = alertMessage({ classified, url: item.url, competitor: item.competitor });
+  if (message === undefined) {
+    return;
+  }
+  await postAlert(message);
+};
+
+/**
  * The P pipeline for one item: classify → route vertical → normalize → hash →
  * layer-1 exact dedupe → embed → layer-2 neighbour arbitration → layer-3
- * canonical merge or upsert. Classification runs first because the routed
+ * canonical merge or upsert, with an immediate alert for fresh
+ * complaint/outage items. Classification runs first because the routed
  * vertical decides the namespace every later stage operates in. Assumes the
  * caller already filtered seen URLs.
  */
@@ -254,6 +271,7 @@ const processRawItem = async (rawItem: RawItem): Promise<ProcessOutcome> => {
     return ProcessOutcome.Merged;
   }
   await storeItem({ namespace, item, classified, vector, hash, storyId });
+  await maybeAlert(item, classified, storyId);
   return ProcessOutcome.Stored;
 };
 

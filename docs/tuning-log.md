@@ -5,7 +5,7 @@ Every change to a tuning threshold, with date and reason. Current values:
 | Threshold | Where | Value |
 |---|---|---|
 | Dedupe candidate similarity (layer 2) | `src/pipeline/process.ts` `DEDUPE_SIMILARITY_THRESHOLD` | 0.90 |
-| Alert sentiment (complaint/outage) | arrives in phase 2 | `moderate` (planned) |
+| Alert sentiment (complaints; outages are not sentiment-gated) | `src/pipeline/alert.ts` `ALERT_SENTIMENT_THRESHOLD` | `moderate` |
 | Report cluster similarity | `src/report/cluster.ts` `CLUSTER_SIMILARITY_THRESHOLD` | 0.85 |
 | Worth-a-read items per digest | `src/report/generate.ts` `WORTH_A_READ_CAP` | 5 |
 | Details stories per digest | `src/report/generate.ts` `DETAILS_STORY_CAP` | 10 |

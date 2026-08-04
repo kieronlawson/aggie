@@ -9,11 +9,15 @@ intelligence, then delivers weekly Slack/email digests per vertical plus immedia
 complaints and outages. It is being built autonomously by Claude, phase by phase, with Kieron
 reviewing at phase gates.
 
-**Current status: phase 4 gate passed 2026-08-03 — Kieron confirmed the 2026-08-02 Sunday
-digests for finance, insurance, and healthcare were vertical-correct in staging; all three
-promoted to `#intel-digest` and the stored digests reposted there. Next: the alert branch —
-before it builds, the classify prompt must learn to distinguish scheduled-future maintenance
-from occurred outages (see the plan's 2026-07-29 amendment).** The source of truth is:
+**Current status: alert branch built 2026-08-04 (its classify precondition — scheduled-future
+maintenance vs occurred outages — closed 2026-08-03). Pipeline P now posts an immediate alert
+to `#intel-staging` for a fresh relevant `outage` or a `complaint` at/above `moderate`
+sentiment (`src/pipeline/alert.ts`; merges, same-story follow-ups, and re-runs never
+re-alert). Awaiting the §4 alert-quality gate [K]: one week of scheduled runs with at least
+one alert firing end-to-end (seed a fixture complaint/outage if the week is quiet), then
+Kieron tunes the sentiment threshold and promotes `ALERT_CHANNEL` to `#intel-competitive`.
+After that gate: phase 5 — four-week observation hold, then the email decision.** The source
+of truth is:
 
 - `docs/2026-07-17-intel-aggregator-spec.md` — approved spec: architecture, data model,
   classification schema, report format, resolved decisions.

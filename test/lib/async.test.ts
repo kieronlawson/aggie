@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { sequentially } from "#src/lib/async.ts";
+import { pacedSequentially, sequentially } from "#src/lib/async.ts";
 
 describe("sequentially", () => {
   it("runs tasks one at a time, in order, and returns results", async () => {
@@ -19,5 +19,37 @@ describe("sequentially", () => {
 
   it("returns empty for empty input", async () => {
     expect(await sequentially([], () => Promise.resolve(1))).toEqual([]);
+  });
+});
+
+describe("pacedSequentially", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits the pace interval between calls but not before the first", async () => {
+    vi.useFakeTimers();
+    const calls: number[] = [];
+    const promise = pacedSequentially(
+      [1, 2, 3],
+      (n: number) => {
+        calls.push(n);
+        return Promise.resolve(n * 2);
+      },
+      1000
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toEqual([1]);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(calls).toEqual([1]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls).toEqual([1, 2]);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(calls).toEqual([1, 2, 3]);
+    expect(await promise).toEqual([2, 4, 6]);
+  });
+
+  it("returns empty for empty input", async () => {
+    expect(await pacedSequentially([], () => Promise.resolve(1), 1000)).toEqual([]);
   });
 });

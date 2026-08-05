@@ -16,9 +16,9 @@ import {
   startChangeTrackingBatch
 } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
-import { sequentially } from "#src/lib/async.ts";
+import { pacedSequentially, sequentially, sleep } from "#src/lib/async.ts";
 import { crawlRawItem } from "#src/pipeline/crawl.ts";
-import { creditsCover, retrieveArticles } from "#src/pipeline/enrich.ts";
+import { creditsCover, retrieveArticles, SCRAPE_PACE_MS } from "#src/pipeline/enrich.ts";
 import { articleRawItem, type CandidateLink, newSameHostLinks } from "#src/pipeline/expand.ts";
 import { ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { SearchDrop, searchRawItem } from "#src/pipeline/search.ts";
@@ -28,8 +28,6 @@ import { Relationship, SourceKind, type SourceRecord } from "#src/registry/types
 
 const POLL_INTERVAL_MS = 15_000;
 const POLL_TIMEOUT_MS = 900_000;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Polls a Firecrawl batch job to completion; one throw covers failure and deadline. */
 const pollUntilDone = async (jobId: string, deadlineMs: number): Promise<BatchResults> => {
@@ -154,7 +152,7 @@ type PageExpansion = {
  */
 const expandPage = async (page: PageLinks, seen: Set<string>, nowIso: string): Promise<PageExpansion> => {
   const freshLinks = R.reject((link: CandidateLink) => seen.has(link.url), page.links);
-  const attempts = await sequentially(freshLinks, attemptScrape);
+  const attempts = await pacedSequentially(freshLinks, attemptScrape, SCRAPE_PACE_MS);
   const articles = R.map(
     (attempt: ScrapeAttempt & { scrape: ScrapedArticle }): ItemWithMeta => ({
       item: articleRawItem({

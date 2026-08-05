@@ -85,3 +85,12 @@ Every change to a tuning threshold, with date and reason. Current values:
   cleanly), and signal bullets must end with a real markdown link or a plain source name —
   never empty parentheses. Reason: the 2026-08-02 digests posted "Continuing stories — None."
   replies, and the insurance card's signals contained bare "()" where citations belonged.
+
+- 2026-08-05 — Article retrieval scrapes are paced at one per 6s (`SCRAPE_PACE_MS`, ~10/min).
+  Reason: the first live W1 run with retrieval (dispatched 2026-08-05) stored 235 items but hit
+  Firecrawl's 11 req/min scrape limit on every high-volume source — ~204 items fell back thin
+  with HTTP 429 (JD Supra ×3, National Law Review, Insurance Journal). Plain sequential calls
+  complete in ~1–2s each and burst past the per-minute ceiling; pacing is spacing, not retry
+  logic, so the no-custom-retries rule stands. Those 204 backfill items stay thin (retro-
+  enrichment is out of scope per the retrieval design); steady-state weekly volume retrieves
+  fully at ~10/min.

@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import * as R from "ramda";
 
 import { fetchFeedEntries, mapEntryToRawItem } from "#src/clients/feeds.ts";
-import { scrapeMarkdown } from "#src/clients/firecrawl.ts";
+import { remainingCredits, scrapeMarkdown } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
 import { patchRows, queryRows, type TpufResultRow, upsertRows } from "#src/clients/turbopuffer.ts";
 import { embed } from "#src/clients/voyage.ts";
@@ -271,46 +271,59 @@ const enrichStoredRow = async (vertical: Vertical, row: TpufResultRow): Promise<
   }
 };
 
-/**
- * One-off: re-enriches stored feed items from the last 14 days whose
- * classification ran on thin feed bodies (pre-retrieval, or 429 fallbacks
- * from the 2026-08-05 backfill run). Feed sources only — crawl diff items
- * must keep their diff content, and story_id/merged_urls are preserved so
- * clustering and dedupe history stay intact. Never alerts.
- */
-const articleBackfill = async (): Promise<void> => {
-  const feedSources = await loadActiveSources(SourceKind.Feed);
-  const feedNames = R.map((source: SourceRecord) => source.name, feedSources);
-  const cutoffMs = Date.now() - INGEST_MAX_AGE_DAYS * DAY_MS;
-  const targets = await sequentially(Object.values(Vertical), async (vertical) => ({
-    vertical,
-    rows: await queryRows({
+/** Digest-facing window: items older than the coming weekly digest never resurface. */
+const BACKFILL_WINDOW_DAYS = 7;
+
+/** Credits left untouched so the scheduled ingest and weekly crawl are never starved. */
+const BACKFILL_CREDIT_RESERVE = 500;
+
+type BackfillTarget = { vertical: Vertical; row: TpufResultRow };
+
+const publishedMs = (row: TpufResultRow): number =>
+  typeof row["published_at_ms"] === "number" ? row["published_at_ms"] : 0;
+
+const backfillTargets = async (feedNames: string[], cutoffMs: number): Promise<BackfillTarget[]> => {
+  const byVertical = await sequentially(Object.values(Vertical), async (vertical) => {
+    const rows = await queryRows({
       namespace: itemsNamespaceFor(vertical),
       filters: ["And", [["source", "In", feedNames], ["published_at_ms", "Gte", cutoffMs]]],
       topK: BACKFILL_QUERY_LIMIT,
       includeAttributes: true
-    })
-  }));
-  const totalRows = R.sum(R.map((target) => target.rows.length, targets));
-  const covered = await creditsCover(totalRows);
-  if (!covered) {
-    throw new Error(`Firecrawl credits insufficient for article backfill: ${String(totalRows)} rows need scraping`);
-  }
-  const results = await sequentially(targets, async ({ vertical, rows }) => {
-    const outcomes = await pacedSequentially(rows, (row) => enrichStoredRow(vertical, row), SCRAPE_PACE_MS);
-    return { vertical, total: rows.length, failures: R.reject(R.isEmpty, outcomes) };
+    });
+    return R.map((row: TpufResultRow): BackfillTarget => ({ vertical, row }), rows);
   });
-  const lines = R.map(
-    (result) => `${result.vertical}: ${String(result.total - result.failures.length)}/${String(result.total)} enriched`,
-    results
+  return R.sortBy((target: BackfillTarget) => -publishedMs(target.row), R.flatten(byVertical));
+};
+
+/**
+ * One-off: re-enriches stored feed items from the digest window whose
+ * classification ran on thin feed bodies (pre-retrieval, or 429 fallbacks
+ * from the 2026-08-05 run). Feed sources only — crawl diff items must keep
+ * their diff content — and story_id/merged_urls are preserved so clustering
+ * and dedupe history stay intact. Never alerts. Spends at most the credits
+ * above the reserve, newest items first; the shortfall is reported.
+ */
+const articleBackfill = async (): Promise<void> => {
+  const feedSources = await loadActiveSources(SourceKind.Feed);
+  const feedNames = R.map((source: SourceRecord) => source.name, feedSources);
+  const cutoffMs = Date.now() - BACKFILL_WINDOW_DAYS * DAY_MS;
+  const targets = await backfillTargets(feedNames, cutoffMs);
+  const budget = Math.max(0, (await remainingCredits()) - BACKFILL_CREDIT_RESERVE);
+  const withinBudget = R.take(budget, targets);
+  const skipped = targets.length - withinBudget.length;
+  const outcomes = await pacedSequentially(
+    withinBudget,
+    (target: BackfillTarget) => enrichStoredRow(target.vertical, target.row),
+    SCRAPE_PACE_MS
   );
-  const failureLines = R.map(
-    (failure: string) => `⚠️ ${failure}`,
-    R.take(1, R.chain((result) => result.failures, results))
-  );
-  const failureCount = R.sum(R.map((result) => result.failures.length, results));
+  const failures = R.reject(R.isEmpty, outcomes);
+  const reserveNote = `preserve the ${String(BACKFILL_CREDIT_RESERVE)}-credit reserve`;
+  const skippedLine = skipped > 0 ? [`⚠️ ${String(skipped)} oldest targets skipped to ${reserveNote}.`] : [];
+  const failureLines = R.map((failure: string) => `⚠️ ${failure}`, R.take(1, failures));
   const summary = [
-    `🧹 Aggie article backfill complete — ${lines.join(", ")}; ${String(failureCount)} scrape failures kept thin.`,
+    `🧹 Aggie article backfill complete — enriched ${String(withinBudget.length - failures.length)} of ` +
+      `${String(targets.length)} targeted items; ${String(failures.length)} scrape failures kept thin.`,
+    ...skippedLine,
     ...failureLines
   ].join("\n");
   console.log(summary);

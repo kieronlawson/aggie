@@ -8,6 +8,8 @@ import {
   type CrawlPageResult,
   getBatchResults,
   remainingCredits,
+  type ScrapedArticle,
+  scrapeMarkdown,
   type SearchNewsResult,
   searchRecent,
   type SearchWebResult,
@@ -16,6 +18,8 @@ import {
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { crawlRawItem } from "#src/pipeline/crawl.ts";
+import { creditsCover, retrieveArticles } from "#src/pipeline/enrich.ts";
+import { articleRawItem, type CandidateLink, newSameHostLinks } from "#src/pipeline/expand.ts";
 import { ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { SearchDrop, searchRawItem } from "#src/pipeline/search.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
@@ -109,6 +113,108 @@ const processItem = async (meta: ItemWithMeta): Promise<ProcessResult> => {
   }
 };
 
+type PageLinks = { meta: ItemWithMeta; links: CandidateLink[]; overflow: number };
+
+/** Changed pages whose diff added same-host links — index pages with new stories behind them. */
+const pageCandidates = (changed: ItemWithMeta[]): PageLinks[] =>
+  R.filter(
+    (page: PageLinks) => page.links.length > 0,
+    R.map((meta: ItemWithMeta): PageLinks => {
+      const { links, overflow } = newSameHostLinks(meta.item.diff_text ?? "", meta.item.url);
+      return { meta, links, overflow };
+    }, changed)
+  );
+
+type ScrapeAttempt = { link: CandidateLink; scrape: ScrapedArticle | null; failure: string };
+
+const isScrapeSuccess = (attempt: ScrapeAttempt): attempt is ScrapeAttempt & { scrape: ScrapedArticle } =>
+  attempt.scrape !== null;
+
+const attemptScrape = async (link: CandidateLink): Promise<ScrapeAttempt> => {
+  try {
+    return { link, scrape: await scrapeMarkdown(link.url), failure: "" };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { link, scrape: null, failure: detail };
+  }
+};
+
+type PageExpansion = {
+  pageUrl: string;
+  articles: ItemWithMeta[];
+  suppressed: boolean;
+  failures: string[];
+};
+
+/**
+ * Scrapes each fresh linked article into its own item. The page's diff item is
+ * suppressed only when every fresh link scraped — any failure keeps the diff
+ * item so the signal is never lost. Zero fresh links (all already stored) also
+ * suppresses: the stories are covered, the index rotation itself is noise.
+ */
+const expandPage = async (page: PageLinks, seen: Set<string>, nowIso: string): Promise<PageExpansion> => {
+  const freshLinks = R.reject((link: CandidateLink) => seen.has(link.url), page.links);
+  const attempts = await sequentially(freshLinks, attemptScrape);
+  const articles = R.map(
+    (attempt: ScrapeAttempt & { scrape: ScrapedArticle }): ItemWithMeta => ({
+      item: articleRawItem({
+        source: page.meta.source,
+        relationship: page.meta.item.relationship,
+        link: attempt.link,
+        scrape: attempt.scrape,
+        nowIso
+      }),
+      source: page.meta.source,
+      isNew: false
+    }),
+    R.filter(isScrapeSuccess, attempts)
+  );
+  const failures = R.map(
+    (attempt: ScrapeAttempt) => `${page.meta.source.name}: expansion scrape failed — ${attempt.failure}`,
+    R.reject(isScrapeSuccess, attempts)
+  );
+  return { pageUrl: page.meta.item.url, articles, suppressed: failures.length === 0, failures };
+};
+
+type ExpansionResult = {
+  articles: ItemWithMeta[];
+  suppressedUrls: string[];
+  warnings: string[];
+};
+
+const NO_EXPANSION: ExpansionResult = { articles: [], suppressedUrls: [], warnings: [] };
+
+const overflowWarnings = (pages: PageLinks[]): string[] =>
+  R.map(
+    (page: PageLinks) =>
+      `${page.meta.source.name}: ${String(page.overflow)} expansion links over the per-page cap dropped`,
+    R.filter((page: PageLinks) => page.overflow > 0, pages)
+  );
+
+/** Index expansion for changed pages; insufficient credits = no expansion, diff items flow as before. */
+const expandChangedPages = async (changed: ItemWithMeta[], nowIso: string): Promise<ExpansionResult> => {
+  const pages = pageCandidates(changed);
+  if (pages.length === 0) {
+    return NO_EXPANSION;
+  }
+  const allUrls = R.uniq(R.chain((page: PageLinks) => R.map((link: CandidateLink) => link.url, page.links), pages));
+  const seen = await seenItemUrls(allUrls);
+  const covered = await creditsCover(R.length(R.reject((url: string) => seen.has(url), allUrls)));
+  if (!covered) {
+    const skipped = `credits low — index expansion skipped for ${String(pages.length)} changed pages`;
+    return { ...NO_EXPANSION, warnings: [...overflowWarnings(pages), skipped] };
+  }
+  const expansions = await sequentially(pages, (page) => expandPage(page, seen, nowIso));
+  return {
+    articles: R.chain((expansion: PageExpansion) => expansion.articles, expansions),
+    suppressedUrls: R.map(
+      (expansion: PageExpansion) => expansion.pageUrl,
+      R.filter((expansion: PageExpansion) => expansion.suppressed, expansions)
+    ),
+    warnings: [...overflowWarnings(pages), ...R.chain((expansion: PageExpansion) => expansion.failures, expansions)]
+  };
+};
+
 type SummaryInput = {
   totalPages: number;
   unmatchedCount: number;
@@ -116,6 +222,8 @@ type SummaryInput = {
   newCount: number;
   unchangedOrRemoved: number;
   alreadySeen: number;
+  expandedArticles: number;
+  suppressedPages: number;
   stored: number;
   merged: number;
   failures: string[];
@@ -124,13 +232,20 @@ type SummaryInput = {
 const summarize = (input: SummaryInput): string => {
   const unmatchedLine =
     input.unmatchedCount > 0 ? [`${String(input.unmatchedCount)} pages did not match a registered source.`] : [];
+  const expansionLine =
+    input.expandedArticles > 0 || input.suppressedPages > 0
+      ? [
+        `🔗 Expanded ${String(input.expandedArticles)} articles from changed index pages; ` +
+            `${String(input.suppressedPages)} "page updated" items suppressed.`
+      ]
+      : [];
   const failureLines = R.map((failure: string) => `⚠️ ${failure}`, input.failures);
   const headline =
     `🕸️ Aggie crawl: ${String(input.totalPages)} pages checked — ${String(input.changed)} changed, ` +
     `${String(input.newCount)} new (${String(input.alreadySeen)} of them already seen), ` +
     `${String(input.unchangedOrRemoved)} unchanged/removed; ` +
     `stored ${String(input.stored)}, merged ${String(input.merged)}.`;
-  return [headline, ...unmatchedLine, ...failureLines].join("\n");
+  return [headline, ...expansionLine, ...unmatchedLine, ...failureLines].join("\n");
 };
 
 const runCrawlStage = async (relationshipByName: Record<string, Relationship>): Promise<string> => {
@@ -156,7 +271,10 @@ const runCrawlStage = async (relationshipByName: Record<string, Relationship>): 
   const newItems = R.filter((meta: ItemWithMeta) => meta.isNew, itemsWithMeta);
   const changedItems = R.reject((meta: ItemWithMeta) => meta.isNew, itemsWithMeta);
   const { kept, alreadySeen } = await dropSeenNewItems(newItems);
-  const processed = await sequentially([...kept, ...changedItems], processItem);
+  const expansion = await expandChangedPages(changedItems, new Date().toISOString());
+  const suppressed = new Set(expansion.suppressedUrls);
+  const emittedChanged = R.reject((meta: ItemWithMeta) => suppressed.has(meta.item.url), changedItems);
+  const processed = await sequentially([...kept, ...emittedChanged, ...expansion.articles], processItem);
   const failures = R.reject(R.isEmpty, R.map((p: ProcessResult) => p.failure, processed));
   const changedCount = R.count((m: MatchedPage) => m.page.changeStatus === ChangeStatus.Changed, matched);
   const newCount = R.count((m: MatchedPage) => m.page.changeStatus === ChangeStatus.New, matched);
@@ -167,9 +285,11 @@ const runCrawlStage = async (relationshipByName: Record<string, Relationship>): 
     newCount,
     unchangedOrRemoved: matched.length - changedCount - newCount,
     alreadySeen,
+    expandedArticles: expansion.articles.length,
+    suppressedPages: suppressed.size,
     stored: R.count((p: ProcessResult) => p.outcome === ProcessOutcome.Stored, processed),
     merged: R.count((p: ProcessResult) => p.outcome === ProcessOutcome.Merged, processed),
-    failures
+    failures: [...expansion.warnings, ...failures]
   });
 };
 
@@ -186,6 +306,8 @@ type SearchOutcome = {
   unseen: number;
   stored: number;
   merged: number;
+  thin: number;
+  warning: string;
   failure: string;
 };
 
@@ -200,7 +322,29 @@ const EMPTY_SEARCH_OUTCOME: SearchOutcome = {
   unseen: 0,
   stored: 0,
   merged: 0,
+  thin: 0,
+  warning: "",
   failure: ""
+};
+
+type SearchRetrieval = { items: RawItem[]; thin: number; warning: string };
+
+/** Full-article retrieval for fresh search items — title+snippet alone is not analysable text. */
+const retrieveSearchItems = async (source: SourceRecord, unseen: RawItem[]): Promise<SearchRetrieval> => {
+  const covered = await creditsCover(unseen.length);
+  if (!covered) {
+    return {
+      items: unseen,
+      thin: unseen.length,
+      warning: `${source.name}: credits low — search retrieval skipped, ${String(unseen.length)} items thin`
+    };
+  }
+  const { items, failures } = await retrieveArticles(unseen);
+  const warning =
+    failures.length > 0
+      ? `${source.name}: ${String(failures.length)} article retrievals failed, kept thin (${failures[0] ?? ""})`
+      : "";
+  return { items, thin: failures.length, warning };
 };
 
 const isRawItem = (value: RawItem | SearchDrop): value is RawItem => typeof value !== "string";
@@ -226,7 +370,8 @@ const searchSource = async (source: SourceRecord, nowMs: number): Promise<Search
     const fresh = R.uniqBy((item: RawItem) => item.url, R.filter(isRawItem, mapped));
     const seen = await seenItemUrls(R.map((item: RawItem) => item.url, fresh));
     const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
-    const outcomes = await sequentially(unseen, processRawItem);
+    const retrieval = await retrieveSearchItems(source, unseen);
+    const outcomes = await sequentially(retrieval.items, processRawItem);
     return {
       ...EMPTY_SEARCH_OUTCOME,
       fetched: results.length,
@@ -238,7 +383,9 @@ const searchSource = async (source: SourceRecord, nowMs: number): Promise<Search
       alreadySeen: fresh.length - unseen.length,
       unseen: unseen.length,
       stored: R.count((outcome) => outcome === ProcessOutcome.Stored, outcomes),
-      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes)
+      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes),
+      thin: retrieval.thin,
+      warning: retrieval.warning
     };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -253,16 +400,17 @@ const runSearchStage = async (): Promise<string> => {
   }
   const nowMs = Date.now();
   const outcomes = await sequentially(sources, (source) => searchSource(source, nowMs));
-  const total = (key: keyof Omit<SearchOutcome, "failure">): number =>
+  const total = (key: keyof Omit<SearchOutcome, "failure" | "warning">): number =>
     R.sum(R.map((outcome: SearchOutcome) => outcome[key], outcomes));
+  const warnings = R.reject(R.isEmpty, R.map((outcome: SearchOutcome) => outcome.warning, outcomes));
   const failures = R.reject(R.isEmpty, R.map((outcome: SearchOutcome) => outcome.failure, outcomes));
   const headline =
     `🔎 Aggie search: ${String(sources.length)} queries — ${String(total("fetched"))} results ` +
     `(${String(total("noUrl"))} no-url, ${String(total("social"))} social, ${String(total("listing"))} listing, ` +
     `${String(total("undated"))} undated, ${String(total("stale"))} stale, ` +
     `${String(total("alreadySeen"))} already seen), ${String(total("unseen"))} fresh/unseen; ` +
-    `stored ${String(total("stored"))}, merged ${String(total("merged"))}.`;
-  return [headline, ...R.map((failure: string) => `⚠️ ${failure}`, failures)].join("\n");
+    `stored ${String(total("stored"))}, merged ${String(total("merged"))}, ${String(total("thin"))} thin.`;
+  return [headline, ...R.map((line: string) => `⚠️ ${line}`, [...warnings, ...failures])].join("\n");
 };
 
 const main = async (): Promise<void> => {

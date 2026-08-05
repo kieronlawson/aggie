@@ -46,6 +46,34 @@ const scrapeRaw = async (url: string): Promise<string> => {
   return raw;
 };
 
+type MarkdownScrapeResponse = {
+  success: boolean;
+  data?: { markdown?: string | null; metadata?: { title?: string } };
+};
+
+type ScrapedArticle = {
+  title: string;
+  markdown: string;
+};
+
+/** Fetches a page's main content as markdown — the retrieval primitive for article bodies. */
+const scrapeMarkdown = async (url: string): Promise<ScrapedArticle> => {
+  const response = await fetch(`${FIRECRAWL_API_BASE}/scrape`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ url, formats: ["markdown"], proxy: "auto" })
+  });
+  if (!response.ok) {
+    throw new Error(`Firecrawl scrape failed for ${url}: HTTP ${String(response.status)} ${await response.text()}`);
+  }
+  const payload = (await response.json()) as MarkdownScrapeResponse;
+  const markdown = payload.data?.markdown ?? "";
+  if (markdown.length === 0) {
+    throw new Error(`Firecrawl scrape returned empty markdown for ${url}`);
+  }
+  return { title: payload.data?.metadata?.title ?? "", markdown };
+};
+
 type SearchNewsResult = {
   title?: string;
   url?: string;
@@ -212,6 +240,8 @@ export {
   FIRECRAWL_API_BASE,
   getBatchResults,
   remainingCredits,
+  type ScrapedArticle,
+  scrapeMarkdown,
   scrapeRaw,
   type SearchNewsResult,
   searchRecent,

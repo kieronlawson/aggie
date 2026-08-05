@@ -1,7 +1,8 @@
 # Article retrieval — feed enrichment + crawl index expansion: design
 
 Date: 2026-07-24
-Status: draft — awaiting Kieron's review (spec only; no build yet)
+Status: implemented 2026-08-05 (build green-lit by Kieron after the RingCentral newsroom
+index-diff misread; see docs/tuning-log.md 2026-08-03 for the triggering incident class)
 Amended 2026-08-03 (Kieron): no length threshold — retrieve the article for EVERY fresh item.
 Search-sourced items (added since the first draft; content = title + snippet) are covered too.
 

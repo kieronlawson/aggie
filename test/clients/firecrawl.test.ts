@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ChangeStatus,
   getBatchResults,
+  scrapeMarkdown,
   startChangeTrackingBatch
 } from "#src/clients/firecrawl.ts";
 
@@ -114,5 +115,47 @@ describe("firecrawl batch change tracking", () => {
     vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 502 })));
     await expect(getBatchResults("job-3")).rejects.toThrow(/502/u);
+  });
+});
+
+describe("scrapeMarkdown", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("requests markdown with proxy auto and returns title + markdown", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    const payload = {
+      success: true,
+      data: { markdown: "# Article body", metadata: { title: "Article title" } }
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(payload));
+    vi.stubGlobal("fetch", fetchMock);
+    const article = await scrapeMarkdown("https://a.example/post");
+    expect(article).toEqual({ title: "Article title", markdown: "# Article body" });
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body["url"]).toBe("https://a.example/post");
+    expect(body["formats"]).toEqual(["markdown"]);
+    expect(body["proxy"]).toBe("auto");
+  });
+
+  it("returns an empty title when metadata has none", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { markdown: "body" } })));
+    const article = await scrapeMarkdown("https://a.example/post");
+    expect(article).toEqual({ title: "", markdown: "body" });
+  });
+
+  it("throws on a non-OK response", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 502 })));
+    await expect(scrapeMarkdown("https://a.example/post")).rejects.toThrow(/502/u);
+  });
+
+  it("throws when the scrape returns empty markdown", async () => {
+    vi.stubEnv("FIRECRAWL_API_KEY", "fc-test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { markdown: "" } })));
+    await expect(scrapeMarkdown("https://a.example/post")).rejects.toThrow(/empty markdown/u);
   });
 });

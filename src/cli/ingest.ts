@@ -7,6 +7,7 @@ import { postMessage, SlackChannel } from "#src/clients/slack.ts";
 import { patchRows, queryRows, type TpufResultRow } from "#src/clients/turbopuffer.ts";
 import { sequentially } from "#src/lib/async.ts";
 import { classifyItem } from "#src/pipeline/classify.ts";
+import { creditsCover, retrieveArticles } from "#src/pipeline/enrich.ts";
 import { itemsNamespaceFor, ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
@@ -16,12 +17,22 @@ import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/regi
 const INGEST_MAX_AGE_DAYS = 14;
 const DAY_MS = 86_400_000;
 
+type CollectedSource = {
+  source: SourceRecord;
+  fetched: number;
+  fresh: number;
+  unseen: RawItem[];
+  error: string;
+};
+
 type SourceResult = {
   source: string;
   fetched: number;
   fresh: number;
   stored: number;
   merged: number;
+  thin: number;
+  thinDetail: string;
   error: string;
 };
 
@@ -33,10 +44,11 @@ const freshItems = (items: RawItem[], nowMs: number): RawItem[] => {
   );
 };
 
-const ingestSource = async (
+/** Fetch + filter only — retrieval and processing wait for the run-wide credits check. */
+const collectSource = async (
   source: SourceRecord,
   relationshipByName: Record<string, Relationship>
-): Promise<SourceResult> => {
+): Promise<CollectedSource> => {
   try {
     const entries = await fetchFeedEntries(source.url);
     const relationship =
@@ -48,22 +60,42 @@ const ingestSource = async (
     const fresh = freshItems(mapped, Date.now());
     const seen = await seenItemUrls(R.map((item: RawItem) => item.url, fresh));
     const unseen = R.reject((item: RawItem) => seen.has(item.url), fresh);
-    const outcomes = await sequentially(unseen, processRawItem);
-    return {
-      source: source.name,
-      fetched: entries.length,
-      fresh: fresh.length,
-      stored: R.count((outcome) => outcome === ProcessOutcome.Stored, outcomes),
-      merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes),
-      error: ""
-    };
+    return { source, fetched: entries.length, fresh: fresh.length, unseen, error: "" };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return { source: source.name, fetched: 0, fresh: 0, stored: 0, merged: 0, error: detail };
+    return { source, fetched: 0, fresh: 0, unseen: [], error: detail };
   }
 };
 
-const summarize = (results: SourceResult[]): string => {
+/** Retrieves each unseen item's article (unless credits ruled it out), then processes. */
+const processCollected = async (collected: CollectedSource, retrieve: boolean): Promise<SourceResult> => {
+  const base = {
+    source: collected.source.name,
+    fetched: collected.fetched,
+    fresh: collected.fresh,
+    stored: 0,
+    merged: 0,
+    thin: 0,
+    thinDetail: "",
+    error: collected.error
+  };
+  if (collected.error.length > 0) {
+    return base;
+  }
+  const { items, failures } = retrieve
+    ? await retrieveArticles(collected.unseen)
+    : { items: collected.unseen, failures: [] };
+  const outcomes = await sequentially(items, processRawItem);
+  return {
+    ...base,
+    stored: R.count((outcome) => outcome === ProcessOutcome.Stored, outcomes),
+    merged: R.count((outcome) => outcome === ProcessOutcome.Merged, outcomes),
+    thin: failures.length,
+    thinDetail: failures[0] ?? ""
+  };
+};
+
+const summarize = (results: SourceResult[], retrieve: boolean): string => {
   const stored = R.sum(R.map((result: SourceResult) => result.stored, results));
   const merged = R.sum(R.map((result: SourceResult) => result.merged, results));
   const failures = R.filter((result: SourceResult) => result.error.length > 0, results);
@@ -71,9 +103,19 @@ const summarize = (results: SourceResult[]): string => {
     (failure: SourceResult) => `⚠️ ${failure.source}: ${failure.error}`,
     failures
   );
+  const creditsLine = retrieve
+    ? []
+    : ["⚠️ Firecrawl credits below the fresh-item count — article retrieval skipped, items stored thin."];
+  const thinLines = R.map(
+    (result: SourceResult) =>
+      `⚠️ ${result.source}: ${String(result.thin)} article retrievals failed, kept thin (${result.thinDetail})`,
+    R.filter((result: SourceResult) => result.thin > 0, results)
+  );
   return [
     `📥 Aggie ingest: ${String(results.length)} feed sources, ${String(stored)} new items stored, ` +
       `${String(merged)} merged as duplicates, ${String(failures.length)} source failures.`,
+    ...creditsLine,
+    ...thinLines,
     ...failureLines
   ].join("\n");
 };
@@ -160,8 +202,11 @@ const runIngest = async (): Promise<void> => {
   const relationshipByName = R.fromPairs(
     R.map((competitor) => [competitor.name, competitor.relationship] as [string, Relationship], competitors)
   );
-  const results = await sequentially(sources, (source) => ingestSource(source, relationshipByName));
-  const summary = summarize(results);
+  const collected = await sequentially(sources, (source) => collectSource(source, relationshipByName));
+  const totalUnseen = R.sum(R.map((entry: CollectedSource) => entry.unseen.length, collected));
+  const retrieve = await creditsCover(totalUnseen);
+  const results = await sequentially(collected, (entry) => processCollected(entry, retrieve));
+  const summary = summarize(results, retrieve);
   console.log(summary);
   await postMessage(SlackChannel.IntelStaging, summary);
 };

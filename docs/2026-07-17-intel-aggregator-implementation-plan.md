@@ -177,8 +177,10 @@ Full design in `docs/2026-08-05-prospect-scanning-spec.md`. A new branch, not an
 it detects prospect companies from hiring patterns — remote/hybrid revenue-generating
 customer-facing roles at a 500+-employee US company in a target vertical, with an active or
 growing compliance org (evidenced by current or trailing-18-month compliance postings) — and
-alerts sales per company. It does not touch pipeline P, the digests, or the existing alert
-branch. [K] decides when this builds; nothing below starts until then.
+posts an enriched prospect brief per company (hiring evidence, tech stack, compliance
+history, market signals), updated in-thread as the picture changes. It does not touch
+pipeline P, the digests, or the existing alert branch. [K] decides when this builds; nothing
+below starts until then.
 
 **Tasks (when scheduled)**
 1. **[K]** Provision a TheirStack account; set `THEIRSTACK_API_KEY` as a repo secret and add
@@ -190,21 +192,30 @@ branch. [K] decides when this builds; nothing below starts until then.
    under `src/prospects/` (queries in code, not registry — resolved in the spec).
 4. Prospect pipeline: fetch current-window revenue-role (remote/hybrid, ≥500 employees) and
    compliance-role postings → group by company domain → exclude competitors (registry
-   aliases) and cooldown companies → establish compliance evidence per revenue-match company
-   (current postings = growing; cached company-filtered historical query = active) → one
-   Claude scoring call per company with evidence → strong matches alert; every considered
-   company upserts to a new `prospects` TurboPuffer namespace (schema in the spec; 90-day
-   alert cooldown; threshold changes logged in `docs/tuning-log.md`).
-5. `prospects` CLI entrypoint behind `w4-prospects.yml` (weekly cron + `workflow_dispatch`,
+   aliases) → establish compliance evidence per revenue-match company (current postings =
+   growing; cached company-filtered historical query = active) → one Claude scoring call per
+   company with evidence; every considered company upserts to a new `prospects` TurboPuffer
+   namespace (schema in the spec; threshold changes logged in `docs/tuning-log.md`).
+5. Enrichment + brief: for strong prospects, gather tech stack (TheirStack technographics,
+   competitor-registry vendors flagged), compliance history (items namespaces + Firecrawl
+   search), and market signals (Firecrawl search); Opus writes the brief; post as skim card +
+   threaded brief, storing the card's Slack `ts`. Update path: new postings or evidence
+   shifts for an alerted prospect → Haiku materiality verdict → material posts an updated
+   brief in-thread; a new card only after the 90-day quiet-then-re-emerge cooldown.
+6. `prospects` CLI entrypoint behind `w4-prospects.yml` (weekly cron + `workflow_dispatch`,
    thin shell); failures post to Slack with context; re-runs idempotent via the namespace.
-6. Fixtures and tests: revenue roles + growing compliance → strong with rationale; revenue
+7. Fixtures and tests: revenue roles + growing compliance → strong with rationale; revenue
    roles + no compliance evidence → recorded not scored; historical-hit company → active,
-   scored, and the check cached (no second query); competitor-domain set → excluded; second
-   run inside cooldown → no re-alert.
+   scored, and the check cached (no second query); competitor-domain set → excluded;
+   re-run of the same window → nothing posts; new material posting for an alerted prospect
+   → in-thread update, no new card; immaterial posting → state update only.
 
 **Acceptance test:** several weeks of scheduled scans on the free tier; at least one prospect
-alert fires end-to-end into `#intel-staging` (seed a fixture company if the market is quiet),
-and a re-run of the same window produces no duplicate alert.
-**Gate [K]:** pilot review — does the co-occurrence pattern surface in TheirStack's data at
-acceptable quality? If yes: decide on the paid tier, tune score threshold/cooldown, and
-promote alerts to `#intel-prospects`. If no: stop at zero cost. ~15 minutes.
+brief posts end-to-end into `#intel-staging` (seed a fixture company if the market is quiet)
+with all five brief sections grounded in linked sources; a re-run of the same window posts
+nothing; a seeded new-posting fixture for that prospect produces an in-thread update, not a
+second card.
+**Gate [K]:** pilot review — does the signal surface in TheirStack's data at acceptable
+quality, and are the briefs worth a seller's read? If yes: decide on the paid tier, tune
+score threshold/materiality bar/cooldown, and promote to `#intel-prospects`. If no: stop at
+zero cost. ~15 minutes.

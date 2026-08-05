@@ -26,8 +26,10 @@ seeded-but-unfetched and unused respectively — and are not repurposed here.
   per-vertical (queries and rubric keyed by vertical) so adding a vertical is a new entry, not
   new machinery.
 - **Geography:** US only.
-- **Delivery:** immediate Slack alerts, one per company, to `#intel-prospects` after the
-  quality gate (staging until then). No digest section, no weekly roll-up.
+- **Delivery:** an immediate Slack **prospect brief** per company — a skim-first card with
+  the full enriched brief in its thread — to `#intel-prospects` after the quality gate
+  (staging until then). Material developments post as updates to the same thread; there is
+  one card per prospect. No digest section, no weekly roll-up.
 
 ## Non-goals
 
@@ -36,8 +38,11 @@ seeded-but-unfetched and unused respectively — and are not repurposed here.
   not fetch, store, or post them.
 - No LinkedIn/G2/Capterra scraping (unchanged from the main spec). TheirStack is a licensed
   aggregation API, not scraping by us.
+- No enrichment vendors beyond what Aggie already uses. Briefs are assembled from TheirStack
+  fields, Aggie's own items namespaces, and Firecrawl search — no Clearbit/ZoomInfo-class
+  services.
 - No per-posting output. The unit of signal is the company; individual postings appear only
-  as evidence links inside a company alert.
+  as evidence links inside a company brief.
 
 ## Signal model
 
@@ -78,8 +83,9 @@ revenue-generating.
 simultaneous revenue-role openings; compliance hiring concurrent with the revenue roles
 (*growing* beats *active*).
 
-**Exclusions:** companies in the competitor registry (matched by name and aliases), and
-companies inside the alert cooldown (see state below).
+**Exclusions:** companies in the competitor registry (matched by name and aliases).
+Already-alerted companies are not excluded — new evidence for them routes to the update path
+(one card per prospect, updates in its thread) rather than a new card.
 
 ## Data source
 
@@ -120,8 +126,9 @@ Voyage embeddings: matching here is exact (company domain) not semantic.
    roles (remote/hybrid, ≥500 employees) and, separately, its compliance roles (same
    filters minus remote/hybrid).
 2. Group postings by company domain.
-3. Drop companies matching the competitor registry (name/aliases) and companies inside the
-   cooldown window in the `prospects` namespace.
+3. Drop companies matching the competitor registry (name/aliases). Already-alerted companies
+   are *not* dropped — their postings continue through, minus anything in `posting_hashes`,
+   so new evidence reaches the update path (step 7).
 4. Establish compliance evidence per revenue-match company: current compliance postings →
    *growing*; otherwise one company-filtered historical query over the trailing window
    (start: 18 months) → any hit is *active*; no hit is *none*. Evidence and check date are
@@ -131,8 +138,42 @@ Voyage embeddings: matching here is exact (company domain) not semantic.
    scores the posting set against the vertical rubric — `strong` / `weak` / `none`, a
    why-now rationale, and the evidence postings. (Companies with evidence *none* are
    recorded but not scored — no LLM spend on non-signals.)
-6. `strong` → post the alert and upsert the company to `prospects` with `last_alerted_at`.
-   `weak` / `none` → upsert without alerting, so repeated scans accumulate history.
+6. `strong` and not previously alerted → enrichment (below), then post the brief and upsert
+   with `last_alerted_at` and the card's Slack `ts`. `weak` / `none` → upsert without
+   posting, so repeated scans accumulate history.
+7. `strong` and previously alerted, with postings not in `posting_hashes` → the update path
+   (below): material developments post to the existing card's thread; nothing ever posts a
+   duplicate card.
+
+**Enrichment (strong prospects only).** Before a brief posts, three lookups ground it —
+each from a source Aggie already pays for or owns:
+
+- **Tech stack** — TheirStack's per-posting technographics (its core enrichment): what the
+  company runs today, and specifically whether a competitor-registry vendor (RingCentral,
+  8x8, Twilio, Aircall, UJET) appears — that turns a cold prospect into a displacement
+  opportunity, or its absence into a greenfield one.
+- **Regulatory/compliance history** — first Aggie's own items namespaces (classification
+  `enforcement_action` etc., matched against extracted `entities`), then Firecrawl news
+  search (existing approved modality, 2 credits/query) for enforcement, fines, breach, or
+  licensing news naming the company.
+- **Market signals** — one Firecrawl news search for recent funding, expansion, or M&A news.
+
+One Opus synthesis call assembles the brief from the hiring evidence plus the three lookups,
+under the same grounding bar as the digest: every claim traceable to a linked source; the
+brief says "nothing found" rather than speculating. Cost is bounded because enrichment runs
+only for strong prospects (expected a few per week at most): ~4–6 Firecrawl credits and two
+Claude calls per brief.
+
+**Updates, not reposts.** `posting_hashes` makes re-runs and long-lived listings inert — a
+posting already attributed to a company never re-triggers anything. When a scan finds
+genuinely new postings (or the compliance evidence shifts, e.g. *active* → *growing*) for a
+company already alerted, one Haiku comparison call judges the delta against the stored brief
+— verdict `material` / `immaterial`, mirroring the dedupe layer-2 verdict pattern.
+`material` → re-run enrichment and post an updated brief to the original card's thread
+(via the stored Slack `ts`), and refresh the stored brief. `immaterial` → update state only,
+no post. A fresh top-level card is allowed only when a prospect has been quiet past the
+cooldown (no qualifying postings for 90+ days) and the pattern re-emerges — a genuinely new
+opportunity, not a continuation.
 
 **Queries and rubric prompts live in code** (`src/prospects/queries.ts`, one typed constant
 per vertical), not the registry. TheirStack queries are structured objects (title arrays,
@@ -148,8 +189,8 @@ accepts for status-page crawls. Cadence tightens only with evidence, logged in
 
 **Failure handling:** the entrypoint posts its own failures to Slack with context, and runs
 are idempotent — the `prospects` namespace makes re-runs and overlapping lookback windows
-safe (already-alerted companies are inside the cooldown; already-seen postings change
-nothing). No custom retry logic.
+safe: already-seen postings are inert via `posting_hashes`, and a run with no new evidence
+posts nothing. No custom retry logic.
 
 ## Data model
 
@@ -168,30 +209,48 @@ vector (all matching is by attribute):
 | `compliance_checked_at` | timestamp | when the historical check last ran; caches the credit spend |
 | `first_seen` | timestamp | first run that surfaced the company |
 | `last_evaluated_at` | timestamp | latest scoring run |
-| `last_alerted_at` | timestamp | empty unless a strong alert has fired |
+| `last_alerted_at` | timestamp | empty unless a card has posted |
+| `slack_ts` | string | message ts of the prospect's card — the thread anchor for updates |
+| `brief` | string | latest brief markdown — the baseline for materiality comparison |
+| `brief_updated_at` | timestamp | when the brief last posted or updated |
 
-**Cooldown:** a company with `last_alerted_at` inside the last **90 days** is never
-re-alerted, regardless of new postings — re-runs, long-lived postings, and slow-rolling
-hiring plans produce one alert, not a drip.
+**Cooldown:** the 90-day cooldown governs **top-level cards only** — one card per prospect
+per opportunity. Material developments inside the window post to the card's thread (see
+"Updates, not reposts"); immaterial ones update state silently. A new card requires the
+prospect to have gone quiet past the cooldown and re-emerged.
 
 **Tunable thresholds** (v1 starting values; changes go in `docs/tuning-log.md` with date and
 reason, per house rules): 500-employee floor, 30-day current window, 18-month
 active-compliance window, 90-day alert cooldown, weekly scan cadence.
 
-## Alert format
+## Brief format
 
-One Slack message per strong company, posted as detected:
+One card per strong company, posted as detected, with the full brief in its thread — the
+same skim-first shape as the digest.
+
+**Card** (the channel view — a seller decides in five seconds whether to open the thread):
 
 > 🎯 **Prospect — finance**: Meridian Wealth Partners (~650 employees, Denver CO)
 > Hiring 6 remote/hybrid financial advisors while growing its compliance org (supervision
-> principal posted this month) — scaling a distributed advisory team under supervision
-> requirements.
+> principal posted this month). Runs 8x8 today; FINRA fine over off-channel comms in 2024.
 > 🔗 Senior Financial Advisor (Remote) ×2 · Financial Advisor (Hybrid) ×4 · Compliance Principal
 
+**Thread — the brief**, one message, sectioned:
+
+1. *Hiring evidence* — the postings, named links, what they say about the motion.
+2. *Tech stack* — what they run (TheirStack technographics); competitor-registry vendors
+   called out as displacement angles, absence called out as greenfield.
+3. *Compliance posture* — enforcement/regulatory history from Aggie's items and Firecrawl
+   search, with links; "nothing found" stated plainly when true.
+4. *Market context* — funding/expansion/M&A signals, with links.
+5. *Why now* — the synthesis: what changed, why Spoke fits, sharpest angle first.
+
+**Updates** post to the same thread, labelled with what changed (e.g. "↑ Updated: compliance
+org now hiring — supervision principal posted"), and the card is never duplicated.
+
+- Grounding bar: same as the digest — every claim traceable to a linked source; no
+  speculation to fill empty sections.
 - Header: vertical + company name + size/location when TheirStack provides them.
-- Body: the model's why-now rationale grounded in the postings — same grounding bar as the
-  digest (claims traceable to evidence).
-- Context row: each evidence posting as a named link to the original listing.
 - Channel: `#intel-staging` until the quality gate; then `#intel-prospects` via the same
   single-constant promotion mechanism the alert branch uses (`ALERT_CHANNEL` pattern in
   `src/pipeline/alert.ts`). Ops posts (📭/❌) stay in staging permanently, as everywhere else.
@@ -205,9 +264,11 @@ One Slack message per strong company, posted as detected:
 2. **Pilot review** (free tier, before paying): does the co-occurrence pattern actually
    surface in TheirStack's data for our verticals? Judged on a few weeks of scan output in
    staging. If the pattern isn't detectable, stop here at zero cost.
-3. **Alert-quality review** (before channel promotion): the same risk as the intel alert
-   branch — noisy alerts train sales to ignore the channel. Tune the score threshold and
-   cooldown, then promote `#intel-staging` → `#intel-prospects`. ~15 minutes.
+3. **Brief-quality review** (before channel promotion): the same risk as the intel alert
+   branch — noisy or thin briefs train sales to ignore the channel. Judge card skimmability,
+   brief grounding, and update materiality (are thread updates worth reading, or drip?).
+   Tune the score threshold, materiality bar, and cooldown, then promote `#intel-staging` →
+   `#intel-prospects`. ~15 minutes.
 
 Build scheduling is not part of this spec: [K] decides when this branch starts relative to
 the intel branches' observation hold.
@@ -233,5 +294,12 @@ the intel branches' observation hold.
 - **Delivery: immediate alerts to a dedicated `#intel-prospects` channel** (Kieron,
   2026-08-05) — sales-facing buying-intent output kept separate from competitor/regulatory
   intel.
+- **Enriched briefs, from in-house sources only** (Kieron, 2026-08-05) — a strong prospect
+  gets a researched brief (tech stack, compliance history, market signals), assembled from
+  TheirStack fields, Aggie's own items namespaces, and Firecrawl search. Opus writes the
+  brief (the synthesis model, per house convention); Haiku judges update materiality.
+- **Updates in-thread, never reposts** (Kieron, 2026-08-05) — one card per prospect; new
+  listings and evidence shifts post updated briefs to the card's thread when a Haiku
+  materiality check says the picture changed. The cooldown governs top-level cards only.
 - **US only, current target verticals** (Kieron, 2026-08-05) — verticals added later reuse
   the per-vertical structure.

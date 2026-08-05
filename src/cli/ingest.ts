@@ -3,12 +3,16 @@ import { parseArgs } from "node:util";
 import * as R from "ramda";
 
 import { fetchFeedEntries, mapEntryToRawItem } from "#src/clients/feeds.ts";
+import { scrapeMarkdown } from "#src/clients/firecrawl.ts";
 import { postMessage, SlackChannel } from "#src/clients/slack.ts";
-import { patchRows, queryRows, type TpufResultRow } from "#src/clients/turbopuffer.ts";
-import { sequentially } from "#src/lib/async.ts";
+import { patchRows, queryRows, type TpufResultRow, upsertRows } from "#src/clients/turbopuffer.ts";
+import { embed } from "#src/clients/voyage.ts";
+import { pacedSequentially, sequentially } from "#src/lib/async.ts";
 import { classifyItem } from "#src/pipeline/classify.ts";
-import { creditsCover, retrieveArticles } from "#src/pipeline/enrich.ts";
-import { itemsNamespaceFor, ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
+import { NEW_PAGE_CHARS } from "#src/pipeline/crawl.ts";
+import { creditsCover, retrieveArticles, SCRAPE_PACE_MS } from "#src/pipeline/enrich.ts";
+import { contentHash, normalizeContent } from "#src/pipeline/normalize.ts";
+import { DIFF_TEXT_SCHEMA, itemsNamespaceFor, ProcessOutcome, processRawItem, seenItemUrls } from "#src/pipeline/process.ts";
 import { type RawItem } from "#src/pipeline/types.ts";
 import { loadActiveSources, loadCompetitors } from "#src/registry/read.ts";
 import { Relationship, SourceKind, type SourceRecord, Vertical } from "#src/registry/types.ts";
@@ -211,9 +215,112 @@ const runIngest = async (): Promise<void> => {
   await postMessage(SlackChannel.IntelStaging, summary);
 };
 
+const ARTICLE_BACKFILL_MODE = "article-backfill";
+
+/** Rebuilds a stored feed item from its freshly scraped article: classify, hash, embed, upsert. */
+const enrichStoredRow = async (vertical: Vertical, row: TpufResultRow): Promise<string> => {
+  try {
+    const url = str(row, "url");
+    const scrape = await scrapeMarkdown(url);
+    const storedRelationship = str(row, "relationship");
+    const pseudoItem: RawItem = {
+      url,
+      title: str(row, "title"),
+      content: scrape.markdown.slice(0, NEW_PAGE_CHARS),
+      published_at: str(row, "published_at"),
+      source: str(row, "source"),
+      vertical,
+      competitor: str(row, "competitor"),
+      relationship: storedRelationship.length > 0 ? (storedRelationship as Relationship) : Relationship.Regulatory
+    };
+    const classified = await classifyItem(pseudoItem);
+    const vectors = await embed([`${classified.title}\n${classified.summary}`], "document");
+    const vector = vectors[0];
+    if (vector === undefined) {
+      throw new Error(`Voyage returned no embedding for ${url}`);
+    }
+    const publishedAtMs = row["published_at_ms"];
+    await upsertRows(itemsNamespaceFor(vertical), [
+      {
+        id: row.id,
+        vector,
+        url,
+        source: pseudoItem.source,
+        vertical,
+        competitor: pseudoItem.competitor,
+        relationship: pseudoItem.relationship,
+        classification: classified.classification,
+        sentiment: classified.sentiment,
+        published_at: pseudoItem.published_at,
+        published_at_ms: typeof publishedAtMs === "number" ? publishedAtMs : Date.parse(pseudoItem.published_at),
+        title: classified.title.length > 0 ? classified.title : pseudoItem.title,
+        summary: classified.summary,
+        entities: classified.entities,
+        relevant: classified.relevant,
+        content_kind: classified.content_kind,
+        merged_urls: Array.isArray(row["merged_urls"]) ? (row["merged_urls"] as string[]) : [],
+        content_hash: contentHash(normalizeContent(`${pseudoItem.title}\n${pseudoItem.content}`)),
+        story_id: str(row, "story_id"),
+        diff_text: str(row, "diff_text")
+      }
+    ], DIFF_TEXT_SCHEMA);
+    return "";
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `${str(row, "url")}: ${detail}`;
+  }
+};
+
+/**
+ * One-off: re-enriches stored feed items from the last 14 days whose
+ * classification ran on thin feed bodies (pre-retrieval, or 429 fallbacks
+ * from the 2026-08-05 backfill run). Feed sources only — crawl diff items
+ * must keep their diff content, and story_id/merged_urls are preserved so
+ * clustering and dedupe history stay intact. Never alerts.
+ */
+const articleBackfill = async (): Promise<void> => {
+  const feedSources = await loadActiveSources(SourceKind.Feed);
+  const feedNames = R.map((source: SourceRecord) => source.name, feedSources);
+  const cutoffMs = Date.now() - INGEST_MAX_AGE_DAYS * DAY_MS;
+  const targets = await sequentially(Object.values(Vertical), async (vertical) => ({
+    vertical,
+    rows: await queryRows({
+      namespace: itemsNamespaceFor(vertical),
+      filters: ["And", [["source", "In", feedNames], ["published_at_ms", "Gte", cutoffMs]]],
+      topK: BACKFILL_QUERY_LIMIT,
+      includeAttributes: true
+    })
+  }));
+  const totalRows = R.sum(R.map((target) => target.rows.length, targets));
+  const covered = await creditsCover(totalRows);
+  if (!covered) {
+    throw new Error(`Firecrawl credits insufficient for article backfill: ${String(totalRows)} rows need scraping`);
+  }
+  const results = await sequentially(targets, async ({ vertical, rows }) => {
+    const outcomes = await pacedSequentially(rows, (row) => enrichStoredRow(vertical, row), SCRAPE_PACE_MS);
+    return { vertical, total: rows.length, failures: R.reject(R.isEmpty, outcomes) };
+  });
+  const lines = R.map(
+    (result) => `${result.vertical}: ${String(result.total - result.failures.length)}/${String(result.total)} enriched`,
+    results
+  );
+  const failureLines = R.map(
+    (failure: string) => `⚠️ ${failure}`,
+    R.take(1, R.chain((result) => result.failures, results))
+  );
+  const failureCount = R.sum(R.map((result) => result.failures.length, results));
+  const summary = [
+    `🧹 Aggie article backfill complete — ${lines.join(", ")}; ${String(failureCount)} scrape failures kept thin.`,
+    ...failureLines
+  ].join("\n");
+  console.log(summary);
+  await postMessage(SlackChannel.IntelStaging, summary);
+};
+
 const MODE_HANDLERS: Record<string, () => Promise<void>> = {
   [RELEVANCE_BACKFILL_MODE]: relevanceBackfill,
-  [SOURCE_NAME_BACKFILL_MODE]: sourceNameBackfill
+  [SOURCE_NAME_BACKFILL_MODE]: sourceNameBackfill,
+  [ARTICLE_BACKFILL_MODE]: articleBackfill
 };
 
 const main = async (): Promise<void> => {

@@ -277,6 +277,7 @@ const processRawItem = async (rawItem: RawItem): Promise<ProcessOutcome> => {
 
 export {
   DEDUPE_SIMILARITY_THRESHOLD,
+  DIFF_TEXT_SCHEMA,
   itemId,
   itemsNamespaceFor,
   layer2StoryId,

@@ -12,6 +12,7 @@ on:
           - ingest
           - relevance-backfill
           - source-name-backfill
+          - article-backfill
   schedule:
     # Daily at 02:00 UTC (~14:00 NZT)
     - cron: "0 2 * * *"

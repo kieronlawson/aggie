@@ -278,6 +278,17 @@ the intel branches' observation hold.
 - **Data source: TheirStack** (2026-08-05) over JSearch (cheaper but no dedupe, no company
   filters — we'd rebuild both), Adzuna (thin US coverage; ToS requires a license for ongoing
   commercial use), Coresignal (LinkedIn-heavy, no dedupe, enterprise pricing).
+- **Indeed-via-Firecrawl considered and excluded** (Kieron review, 2026-08-05) — Indeed
+  likely has the largest raw US inventory for our roles, but reaching it means scraping:
+  Indeed's ToS prohibits it (the same principle behind the main spec's G2/Capterra/LinkedIn
+  non-goal; Indeed has no public API), it is aggressively bot-defended (flaky on a cron),
+  and its search cannot express the employee-count or industry predicates the signal
+  requires — every posting would be fetched blind and mostly discarded. If TheirStack fails
+  the pilot on vertical coverage, the fallback is another licensed aggregator, not Indeed
+  scraping. (Glassdoor is not a distinct source either way: its listings are Indeed's,
+  syndicated — both are Recruit Holdings companies. Glassdoor's unique data is reviews/
+  sentiment, reachable only by the same banned scraping class; the compliant option is a
+  manual-check link.)
 - **Company-shaped pipeline, not P** — the signal is a pattern across postings; forcing it
   through item classification would score fragments of the signal, not the signal itself.
 - **No embeddings** — company identity is exact (domain); nothing here needs similarity.
